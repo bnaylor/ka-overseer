@@ -144,3 +144,17 @@ def test_rounds_count_distinct_commits_not_duplicate_submissions():
     pr["reviews"] = FIX["reviews"] + [dict(bot[0])]          # the bot submitted twice on the same commit
     assert G.classify_pr(pr, 0)["rounds"] == G.classify_pr(FIX, 0)["rounds"]
     assert G.classify_pr(FIX, 0)["rounds"] == len({r["commit"]["oid"] for r in bot})
+
+
+def test_scope_numbers_marks_which_search_found_each_pr():
+    s = S.empty_state()
+    S.pr(s, 5)["scopes"] = ["reviewed"]                  # found by a search last tick, not this one
+    S.pr(s, 9)["scopes"] = ["review_requested"]
+    def broken():
+        raise RuntimeError("HTTP 502")
+    cmds = {"mine": lambda: [6], "review_requested": broken, "reviewed": lambda: [7]}
+    assert G.scope_numbers(s, cmds) == {5, 6, 7, 9}
+    assert s["prs"]["6"]["scopes"] == ["mine"] and s["prs"]["7"]["scopes"] == ["reviewed"]
+    assert s["prs"]["5"]["scopes"] == []                 # dropped out of the search: no longer in that group
+    assert s["prs"]["9"]["scopes"] == ["review_requested"]   # that search failed: keep last tick's answer
+    assert S.pr(S.empty_state(), 1)["scopes"] is None        # never searched: not the same as found by none

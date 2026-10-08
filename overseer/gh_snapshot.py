@@ -160,12 +160,21 @@ LIST_CMDS = {name: (lambda extra=extra: _numbers(extra)) for name, extra in CFG[
 
 
 def scope_numbers(state, list_cmds=LIST_CMDS):
+    """Every PR to snapshot. Also records on each PR row which searches found it (`scopes`), for the dashboard's
+    groups. A search that fails leaves every row's mark for it as it was."""
     nums = {int(n) for n in state["prs"]}
-    for fn in list_cmds.values():
+    for name, fn in list_cmds.items():
         try:
-            nums |= set(fn())
+            hits = set(fn())
         except RuntimeError as e:
             print(f"scope list failed: {e}", file=sys.stderr)
+            continue
+        nums |= hits
+        for n in hits:
+            S.pr(state, n)
+        for n, row in state["prs"].items():
+            marks = [s for s in (row["scopes"] or []) if s != name]
+            row["scopes"] = marks + [name] if int(n) in hits else marks
     return nums
 
 

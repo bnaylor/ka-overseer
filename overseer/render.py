@@ -22,6 +22,7 @@ CSS = """
 @media(prefers-color-scheme:dark){:root{--surface:#1a1a19;--ink:#fff;--ink2:#c3c2b7;--line:#33332f;--band:#3a1f1f;--goodband:#1f2f1f;--tint:#232320}}
 body{margin:0;padding:16px 20px;background:var(--surface);color:var(--ink);font:13px/1.4 -apple-system,Helvetica,Arial,sans-serif}
 h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;color:var(--ink2);margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:12px;color:var(--ink2);margin:12px 0 4px;font-weight:600}
 .attention{border-radius:6px;padding:8px 12px;margin-bottom:6px}
 .attention.red{background:var(--band);border-left:4px solid var(--critical)}
 .attention.green{background:var(--goodband);border-left:4px solid var(--good);color:var(--ink2)}
@@ -149,11 +150,35 @@ def humans_done(p):
                 and (p.get("unresolved_threads") or 0) == 0)
 
 
+# one group per search in config `scope_queries`, in config order; a PR goes in the first group whose search found it
+GROUP_TITLES = {"mine": "Mine", "review_requested": "Review requested from me", "reviewed": "Reviewed by me"}
+OTHER_GROUP = "Other: no search finds it"            # a session reports it, or it dropped out of every search
+UNSORTED = "_unsorted"
+UNSORTED_GROUP = "Not sorted yet: the next tick that reads GitHub sorts these"
+
+
+def _group(p):
+    if p.get("scopes") is None:                        # saved before searches were recorded
+        return UNSORTED
+    return next((name for name in CFG["scope_queries"] if name in p["scopes"]), None)
+
+
 def _prs(state):
+    groups = {name: [] for name in CFG["scope_queries"]}
+    groups[None] = []
+    groups[UNSORTED] = []
+    for item in sorted(state["prs"].items(), key=_pr_sort_key):
+        if item[1].get("state") in S.OPEN_PR_STATES:
+            groups[_group(item[1])].append(item)
+    title = lambda name: OTHER_GROUP if name is None else UNSORTED_GROUP if name == UNSORTED else GROUP_TITLES.get(name, name)
+    out = [f"<h3>{e(title(name))} ({len(items)})</h3>" + (_pr_table(items) if items else '<p class="muted">None open.</p>')
+           for name, items in groups.items() if items or name in CFG["scope_queries"]]   # every search's group shows, even empty
+    return "".join(out)
+
+
+def _pr_table(items):
     out = []
-    for n, p in sorted(state["prs"].items(), key=_pr_sort_key):
-        if p.get("state") not in S.OPEN_PR_STATES:
-            continue
+    for n, p in items:
         chk, chk_cls = CHECK_ICON.get(p.get("checks"), ("—", "muted"))
         rounds = p.get("rounds")
         rounds_html = f'<span class="cap">{rounds}</span>' if (rounds or 0) >= 6 else e(rounds if rounds is not None else "—")

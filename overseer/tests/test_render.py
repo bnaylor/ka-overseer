@@ -124,3 +124,30 @@ def test_session_rows_carry_the_full_note_for_the_hover_balloon():
     out = V.render(st, None, "2026-10-07T00:00:00Z")
     assert 'data-note="a very long note' in out
     assert "#balloon" in out and "tr[data-note]" in out
+
+
+def test_prs_are_grouped_by_the_search_that_found_them():
+    s = sample()
+    s["prs"]["5"]["scopes"] = ["mine"]
+    s["prs"]["6"]["scopes"] = []
+    S.pr(s, 7).update(title="theirs", state="OPEN", scopes=["reviewed"])
+    S.pr(s, 8).update(title="asked", state="OPEN", scopes=["review_requested"])
+    S.pr(s, 9).update(title="done", state="MERGED", scopes=["mine"])            # closed PRs stay hidden
+    html = V.render(s, None, T0)
+    i_mine, i_req, i_rev, i_other = (html.index(h) for h in (
+        "<h3>Mine (1)</h3>", "<h3>Review requested from me (1)</h3>", "<h3>Reviewed by me (1)</h3>",
+        "<h3>Other: no search finds it (1)</h3>"))
+    assert i_mine < html.index("fix thing") < i_req < html.index("asked") < i_rev < html.index("theirs") < i_other
+    assert html.index("other") > i_other                  # PR 6: no search found it
+    assert ">done<" not in html and "#9" not in html
+
+
+def test_every_search_group_shows_even_when_empty_and_other_only_when_used():
+    html = V.render(S.empty_state(), None, T0)
+    assert "<h3>Mine (0)</h3>" in html and "<h3>Review requested from me (0)</h3>" in html and "<h3>Reviewed by me (0)</h3>" in html
+    assert html.count("None open.") == 3 and "Other:" not in html
+
+
+def test_prs_saved_before_searches_were_recorded_wait_in_not_sorted_yet():
+    html = V.render(sample(), None, T0)                    # sample rows carry no scopes yet
+    assert "<h3>Not sorted yet: the next tick that reads GitHub sorts these (2)</h3>" in html and "Other:" not in html

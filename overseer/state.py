@@ -99,7 +99,7 @@ def _pr_row():
             "rounds": None, "rounds_prev": None, "advisory_rounds": None, "hold": None, "lgtm": None,
             "approved": None, "reviewers": [], "last_activity": None, "updated_at": None,
             "last_owner_report": None, "owner_belief": None, "drift": None,
-            "snapshot_error": None, "hazards": None, "pending_orphan": False}
+            "snapshot_error": None, "hazards": None, "pending_orphan": False, "scopes": None}
 
 
 def session(state, name):
