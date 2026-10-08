@@ -158,3 +158,23 @@ def test_scope_numbers_marks_which_search_found_each_pr():
     assert s["prs"]["5"]["scopes"] == []                 # dropped out of the search: no longer in that group
     assert s["prs"]["9"]["scopes"] == ["review_requested"]   # that search failed: keep last tick's answer
     assert S.pr(S.empty_state(), 1)["scopes"] is None        # never searched: not the same as found by none
+
+
+def test_snapshot_rereads_an_unknown_mergeable_once_after_a_wait():
+    s = S.empty_state()
+    reads, waits = {"n": 0}, []
+
+    def fetch_pr(n):
+        reads["n"] += 1
+        return {**FIX, "state": "OPEN", "mergeable": "UNKNOWN" if reads["n"] == 1 else "CONFLICTING"}
+
+    G.snapshot(s, {2077}, fetch_pr, lambda n: 0, T0, sleep=waits.append)
+    assert s["prs"]["2077"]["mergeable"] == "CONFLICTING"
+    assert waits == [G.MERGEABLE_RETRY_WAIT] and reads["n"] == 2
+
+
+def test_snapshot_skips_the_wait_when_nothing_is_unknown():
+    s = S.empty_state()
+    waits = []
+    G.snapshot(s, {2077}, lambda n: {**FIX, "state": "OPEN", "mergeable": "MERGEABLE"}, lambda n: 0, T0, sleep=waits.append)
+    assert waits == [] and s["prs"]["2077"]["mergeable"] == "MERGEABLE"

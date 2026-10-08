@@ -3,6 +3,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import state as S
@@ -178,7 +179,10 @@ def scope_numbers(state, list_cmds=LIST_CMDS):
     return nums
 
 
-def snapshot(state, numbers, fetch_pr=fetch_pr, fetch_unresolved=fetch_unresolved, now=None):
+MERGEABLE_RETRY_WAIT = 5   # seconds; GitHub computes mergeability lazily, so the first read after main moves says UNKNOWN
+
+
+def snapshot(state, numbers, fetch_pr=fetch_pr, fetch_unresolved=fetch_unresolved, now=None, sleep=time.sleep):
     now = now or S.now_iso()
     result = {"updated": [], "errors": {}}
     for n in sorted(numbers):
@@ -193,8 +197,25 @@ def snapshot(state, numbers, fetch_pr=fetch_pr, fetch_unresolved=fetch_unresolve
         except Exception as e:  # keep the old row, record why
             row["snapshot_error"] = str(e)
             result["errors"][n] = str(e)
+    _retry_unknown_mergeable(state, result["updated"], fetch_pr, sleep)
     state["updated"] = now
     return result
+
+
+def _retry_unknown_mergeable(state, numbers, fetch_pr, sleep):
+    """The first read asked GitHub to compute mergeability; one re-read after a short wait usually has it."""
+    unknown = [n for n in numbers
+               if state["prs"][str(n)].get("state") == "OPEN" and state["prs"][str(n)].get("mergeable") == "UNKNOWN"]
+    if not unknown:
+        return
+    sleep(MERGEABLE_RETRY_WAIT)
+    for n in unknown:
+        try:
+            value = fetch_pr(n).get("mergeable")
+        except Exception:
+            continue
+        if value:
+            state["prs"][str(n)]["mergeable"] = value
 
 
 BRANCH_PR_FIELDS = "number,state,headRefName,headRefOid,headRepositoryOwner,url,updatedAt"
