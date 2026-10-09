@@ -7,6 +7,7 @@ from gh_snapshot import ROUND_CAP
 SILENT_FACTOR = 2
 THREADS_HOURS = 2
 RED_HOURS = 1
+CONFLICT_HOURS = 1        # a conflict blocks merge as hard as a red (rule 22); held PRs included, they must stay merge-ready
 NO_REVIEWER_HOURS = 24
 INTRO_GRACE_MIN = 5          # short-lived sessions come and go; do not INTRO until one has lived this long
 SKIP_PING = {"waiting"}          # gone sessions never reach the ladder: compute_actions skips them
@@ -77,6 +78,11 @@ def compute_actions(state, now, default_cadence_min=30):
             if p.get("checks") == "red" and moved is not None and moved >= timedelta(hours=RED_HOURS) \
                     and silent is not None and silent >= timedelta(hours=RED_HOURS):
                 _escalate(state, now, name, row, num, "red", f"#{num} red for over {RED_HOURS}h, owner silent", actions)
+                pinged_this_pass = True
+            elif p.get("mergeable") == "CONFLICTING" and silent is not None \
+                    and silent >= timedelta(hours=CONFLICT_HOURS) and row.get("role") != "review-minder":
+                _escalate(state, now, name, row, num, "conflict",
+                          f"#{num} conflicts with main, owner silent {CONFLICT_HOURS}h+; merge main (rule 22)", actions)
                 pinged_this_pass = True
             elif (p.get("unresolved_threads") or 0) > 0 and not p.get("hold") and moved is not None \
                     and moved >= timedelta(hours=THREADS_HOURS) and silent is not None \

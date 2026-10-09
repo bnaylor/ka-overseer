@@ -224,3 +224,18 @@ def test_no_reviewer_advice_skips_a_pr_that_already_has_lgtm():
     s["prs"]["5"].update(reviewers=[], last_activity=T0, lgtm=True)
     s["sessions"]["kube-agents-vamp-1"]["status"] = "waiting-review"
     assert types(X.compute_actions(s, T_PLUS_2D), "ADVICE") == []
+
+
+def test_conflicting_pr_pings_once_the_owner_is_silent_an_hour_even_when_held():
+    s = base()
+    s["prs"]["5"].update(mergeable="CONFLICTING", hold=True)
+    assert X.compute_actions(s, "2026-10-01T18:30:00Z") == []          # owner reported half an hour ago
+    a = types(X.compute_actions(s, T_PLUS_70M), "PING")
+    assert a and a[0]["kind"] == "conflict" and "rule 22" in a[0]["reason"]
+
+
+def test_review_minder_is_not_pinged_for_another_authors_conflict():
+    s = base()
+    s["prs"]["5"].update(mergeable="CONFLICTING")
+    s["sessions"]["kube-agents-vamp-1"]["role"] = "review-minder"
+    assert types(X.compute_actions(s, T_PLUS_70M), "PING") == []
