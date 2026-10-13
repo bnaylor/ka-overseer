@@ -70,6 +70,7 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `docs/` | design, protocol, rules, escalation, original brief |
 | `skills/working-with-the-overseer/` | the skill other sessions load |
 | `briefs/` | the Overseer loop brief and the report-in sentence for other briefs |
+| `role-examples/` | starting prompts, permissions and lessons for the planner, minders, cluster manager and worktree cleanup |
 | `tools/portify.py` | the transform that extracted this package from its origin repo, for the record |
 
 Runtime files the Overseer writes into `overseer/`: `state.json`, `reports.log` (append-only,
