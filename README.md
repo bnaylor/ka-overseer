@@ -37,17 +37,28 @@ shipped set is the kube-agents team's, edit freely.
 
 ## Quick start
 
+**With an agent:** point a Claude Code session at this repo: *"Install the Overseer from
+https://github.com/bnaylor/ka-overseer, following its INSTALL.md."*  It asks you five questions
+and does the rest.
+
+**By hand:**
+
 1. Put this directory somewhere stable, e.g. `~/ka-overseer`. The code finds its own files.
-2. Edit `overseer/config.json`: your repo, the gating bot login, the advisory bot login (or
-   `""`), the round cap, the regex matching your session names, any checkout path prefixes whose sessions count regardless of name (`cwd_prefixes`), and how the human is named.
-3. `./install.sh` symlinks the skill into `~/.claude/skills/` so every session can see it, and
-   runs the test suite.
+2. Configure: `python3 overseer/configure.py --repo owner/name --gating-bot <login>
+   --advisory-bot <login or ""> --session-pattern '<regex>' [--cwd-prefix <path>] [--human "<name>"]`.
+   It writes `overseer/config.json`; edit that directly for anything else (round cap, ignored
+   check contexts, scope queries).
+3. `./install.sh` checks prerequisites, symlinks the skill into `~/.claude/skills/` so every
+   session can see it, and runs the test suite.
 4. In a spare terminal: `zsh overseer/watch.sh`.
 5. Start a Claude Code session in this directory and give it `briefs/overseer-loop.txt` as a
    self-paced `/loop` prompt. It introduces itself to the sessions it finds, pulls GitHub,
    writes `overseer/state.json`, and opens the dashboard.
 6. Add the sentence in `briefs/minder-report-in.txt` to the briefs of your other loops so new
    sessions report on start.
+7. Highly recommend adding at least a planner from `role-examples/`: the session every other
+   session asks before asking you.  The other role examples cover PR and review minders, an issue
+   sweeper, a cluster manager, and worktree cleanup.
 
 Requirements: macOS for `osascript` notifications (set `"notify"` to anything else to
 disable), Python 3.11+ with no third-party packages, `gh` logged in, and a Claude Code with
@@ -65,12 +76,13 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `overseer/roster.py`, `overseer/watch.sh` | roster reader and the one-minute watcher |
 | `overseer/render.py` | state to dashboard |
 | `overseer/drift.py`, `overseer/drift-prompt.md` | a PR past the round cap gets a read-only `claude -p` drift review (once per head); the verdict lands as attention. The Overseer fetches the PR history itself; the agent gets Read/Grep/Glob over that bundle and nothing else |
-| `overseer/config.json` | deployment settings |
+| `overseer/config.json`, `overseer/configure.py` | deployment settings, and the flag-driven writer for them |
 | `overseer/tests/` | `python3 -m pytest overseer/tests -q` |
 | `docs/` | design, protocol, rules, escalation, original brief |
 | `skills/working-with-the-overseer/` | the skill other sessions load |
 | `briefs/` | the Overseer loop brief and the report-in sentence for other briefs |
 | `role-examples/` | starting prompts, permissions and lessons for the planner, minders, cluster manager and worktree cleanup |
+| `INSTALL.md` | step-by-step install for an agent pointed at this repo |
 | `tools/portify.py` | the transform that extracted this package from its origin repo, for the record |
 
 Runtime files the Overseer writes into `overseer/`: `state.json`, `reports.log` (append-only,
