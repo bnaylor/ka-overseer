@@ -267,3 +267,39 @@ def test_tick_line_survives_the_summary_cap(tmp_path, monkeypatch, capsys):
     summary = json.loads(capsys.readouterr().out)["summary"]
     assert len(summary) == 5
     assert summary[-1].startswith("tick 1, ")             # the tick line carries the worktree count; never cut
+
+
+def test_prs_unchanged_keeps_the_previous_list(tmp_path, monkeypatch, capsys):
+    d = setup(tmp_path, monkeypatch)
+    monkeypatch.setattr("sys.stdin", io.StringIO("OVERSEER REPORT worker-a\nprs: #5 round 1 0-threads no-hold; #6 round 2 1-threads hold\nstatus: working\n"))
+    assert ovsr.main(["--dir", d, "report"]) == 0
+    monkeypatch.setattr("sys.stdin", io.StringIO("OVERSEER REPORT worker-a\nprs: unchanged\nstatus: waiting-review\n"))
+    assert ovsr.main(["--dir", d, "report"]) == 0
+    st = S.load_state(Path(d) / "state.json")
+    assert st["sessions"]["worker-a"]["prs"] == [5, 6]
+    assert st["prs"]["5"]["owner"] == st["prs"]["6"]["owner"] == "worker-a"
+    assert st["sessions"]["worker-a"]["status"] == "waiting-review"
+
+
+def test_a_report_filed_while_a_tick_reads_github_survives_the_tick(tmp_path, monkeypatch, capsys):
+    import fcntl
+    d = setup(tmp_path, monkeypatch)
+    (Path(d) / "roster.json").write_text(json.dumps({"ts": S.now_iso(), "sessions": []}))
+    lock_path = str(Path(d) / "state.json") + ".lock"
+
+    def slow_snapshot(state, numbers, now):
+        with open(lock_path, "a") as f:            # the tick must not hold the lock while it reads GitHub
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(f, fcntl.LOCK_UN)
+        monkeypatch.setattr("sys.stdin", io.StringIO("OVERSEER REPORT worker-a\nprs: #7 round 1 0-threads no-hold\nstatus: working\n"))
+        assert ovsr.main(["--dir", d, "report"]) == 0
+        S.pr(state, 8).update(state="OPEN", mergeable="MERGEABLE")    # what GitHub said, on the tick's copy
+        return {"errors": {}}
+
+    monkeypatch.setattr(ovsr.G, "scope_numbers", lambda state: [8])
+    monkeypatch.setattr(ovsr.G, "snapshot", slow_snapshot)
+    assert ovsr.main(["--dir", d, "tick", "--session", "overseer"]) == 0
+    st = S.load_state(Path(d) / "state.json")
+    assert st["sessions"]["worker-a"]["prs"] == [7]               # the report was not saved over
+    assert st["prs"]["7"]["owner"] == "worker-a"
+    assert st["prs"]["8"]["mergeable"] == "MERGEABLE"             # and GitHub's results still landed

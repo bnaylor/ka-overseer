@@ -18,14 +18,37 @@ def _fields(line):
     return out
 
 
+UNCHANGED = None   # `prs: unchanged`: keep the session's last list (apply_report honours it)
+
+
+def _top_level_fragments(line):
+    """Split on ';' outside parentheses: '(green; #12 merged)' is free text, never a new item."""
+    frags, depth, cur = [], 0, []
+    for ch in line:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        if ch == ";" and depth == 0:
+            frags.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    frags.append("".join(cur))
+    return frags
+
+
 def _pr_items(line):
     prs = {}
-    if line.strip().lower() in ("", "-") or line.strip().lower().startswith("none"):
+    low = line.strip().lower()
+    if low.startswith("unchanged"):
+        return UNCHANGED
+    if low in ("", "-") or low.startswith("none"):
         return prs
     items = []
-    for frag in line.split(";"):
+    for frag in _top_level_fragments(line):
         frag = frag.strip()
-        if PR_ITEM.match(frag):
+        if PR_ITEM.match(frag):          # only an item's leading #N claims a PR
             items.append(frag)
         elif items:                      # a semicolon inside the previous item's free text
             items[-1] += "; " + frag

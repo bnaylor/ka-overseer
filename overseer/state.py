@@ -1,4 +1,6 @@
 """Overseer state: the single source of truth in state.json. Only ovsr.py writes it."""
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -72,6 +74,19 @@ def _provably_auto(item, sessions):
         row = sessions[s]
         return row["status"] == "waiting-human" and what == (row["needs"] or "waiting on the human")
     return True                   # sweep touches no other kind
+
+
+@contextlib.contextmanager
+def locked(path):
+    """Hold an exclusive lock for one load-modify-save of state.json.  The lock is a sidecar file, so the
+    atomic rename that replaces state.json never drops it.  Without it a slow tick saved over reports
+    filed while it was reading GitHub."""
+    with open(str(path) + ".lock", "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def save_state(state, path):
@@ -175,29 +190,31 @@ def apply_report(state, report, now):
         row["status"] = report["status"]
         row["needs"] = report.get("needs")
         row["status_detail"] = report.get("status_detail")
-    # PR ownership
-    reported = sorted(report["prs"])
-    for old in row["prs"]:
-        if old not in reported and state["prs"].get(str(old), {}).get("owner") == name:
-            heirs = _claimants(state, old, exclude={name}, live_only=True) or _claimants(state, old, exclude={name})
-            heir = heirs[0] if heirs else None
-            hand_off(state, old, heir)
-            if heir and not is_live(state, heir):   # only absent sessions list it; the tick raises the orphan once
-                state["prs"][str(old)]["pending_orphan"] = True   # GitHub is read, so a merge raises nothing
-    row["prs"] = reported
-    for number, belief in report["prs"].items():
-        p = pr(state, number)
-        if p["owner"] not in (None, name):
-            other = p["owner"]
-            disputed = any(i["kind"] == "ownership-conflict" and i["pr"] == number for i in state["attention"])
-            if other in _claimants(state, number, live_only=True) and not disputed:   # a gone owner cannot drive it
-                item = add_attention(state, name, "ownership-conflict", number,
-                                     f"#{number} reported by both {other} and {name}; {name} now owner", now)
-                if item:
-                    new.append(item)
-        p["owner"] = name
-        p["last_owner_report"] = now
-        p["owner_belief"] = {"rounds": belief["rounds"], "threads": belief["threads"], "hold": belief["hold"]}
+    # PR ownership.  `prs: unchanged` (None) keeps the last list, beliefs and all.
+    reported = list(row["prs"])
+    if report["prs"] is not None:
+        reported = sorted(report["prs"])
+        for old in row["prs"]:
+            if old not in reported and state["prs"].get(str(old), {}).get("owner") == name:
+                heirs = _claimants(state, old, exclude={name}, live_only=True) or _claimants(state, old, exclude={name})
+                heir = heirs[0] if heirs else None
+                hand_off(state, old, heir)
+                if heir and not is_live(state, heir):   # only absent sessions list it; the tick raises the orphan once
+                    state["prs"][str(old)]["pending_orphan"] = True   # GitHub is read, so a merge raises nothing
+        row["prs"] = reported
+        for number, belief in report["prs"].items():
+            p = pr(state, number)
+            if p["owner"] not in (None, name):
+                other = p["owner"]
+                disputed = any(i["kind"] == "ownership-conflict" and i["pr"] == number for i in state["attention"])
+                if other in _claimants(state, number, live_only=True) and not disputed:   # a gone owner cannot drive it
+                    item = add_attention(state, name, "ownership-conflict", number,
+                                         f"#{number} reported by both {other} and {name}; {name} now owner", now)
+                    if item:
+                        new.append(item)
+            p["owner"] = name
+            p["last_owner_report"] = now
+            p["owner_belief"] = {"rounds": belief["rounds"], "threads": belief["threads"], "hold": belief["hold"]}
     # attention for waiting-human
     if row["status"] == "waiting-human":
         what = row["needs"] or "waiting on the human"

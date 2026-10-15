@@ -125,7 +125,7 @@ def cmd_report(p, a):
         return 2
     state = _load(p)
     new = S.apply_report(state, report, now)
-    for number in report["prs"]:
+    for number in report["prs"] or ():
         row = state["prs"][str(number)]
         if row.get("rounds") is not None:
             row["drift"] = G.compute_drift(row)
@@ -134,9 +134,54 @@ def cmd_report(p, a):
     return 0
 
 
+_ABSENT = object()
+
+
+def _read_github(p, now):
+    """The slow part of a tick, run without the lock on a private copy of the state.  Returns what GitHub
+    changed: per-PR field updates, the worktree table, and the snapshot's errors."""
+    work = _load(p)
+    before = {k: dict(v) for k, v in work["prs"].items()}
+    res = G.snapshot(work, G.scope_numbers(work), now=now)
+    refresh_worktrees(work, now)
+    changes = {}
+    for k, row in work["prs"].items():
+        old = before.get(k, {})
+        diff = {f: v for f, v in row.items() if old.get(f, _ABSENT) != v}
+        if diff or k not in before:
+            changes[k] = diff
+    return res, changes, work.get("worktrees"), work.get("updated")
+
+
+def _merge_github(state, changes, worktrees, updated):
+    """Lay GitHub's results over a freshly loaded state, so reports filed meanwhile survive."""
+    for k, diff in changes.items():
+        row = S.pr(state, int(k))
+        row.update(diff)
+        if "drift" in diff:
+            row["drift"] = G.compute_drift(row)     # recompute against owner beliefs that may have just changed
+    if worktrees is not None:
+        state["worktrees"] = worktrees
+    if updated:
+        state["updated"] = updated
+
+
 def cmd_tick(p, a):
     now = S.now_iso()
-    state = _load(p)
+    gh_errors = {}
+    fresh = False
+    if not a.no_gh:
+        res, changes, worktrees, updated = _read_github(p, now)
+        gh_errors = {str(k): v for k, v in res["errors"].items()}
+        fresh = True
+    with S.locked(p.state):
+        state = _load(p)
+        if fresh:
+            _merge_github(state, changes, worktrees, updated)
+        return _tick_locked(p, a, state, now, gh_errors, fresh)
+
+
+def _tick_locked(p, a, state, now, gh_errors, fresh):
     if a.session:
         state["overseer"]["session"] = a.session
         me = S.session(state, a.session)
@@ -144,12 +189,7 @@ def cmd_tick(p, a):
                   theme=me["theme"] or "all kube-agents sessions", driver=me["driver"] or "loop")
         S.write_atomic(p.dir / "OVERSEER", a.session + "\n")   # one line, grep-proof: who the Overseer is right now
     new = S.apply_roster(state, _roster(p), now)
-    gh_errors = {}
-    if not a.no_gh:
-        res = G.snapshot(state, G.scope_numbers(state), now=now)
-        gh_errors = {str(k): v for k, v in res["errors"].items()}
-        refresh_worktrees(state, now)
-    new += S.raise_orphans(state, now, fresh=not a.no_gh)   # after the snapshot: a dropped PR that merged raises nothing
+    new += S.raise_orphans(state, now, fresh=fresh)   # after the snapshot: a dropped PR that merged raises nothing
     actions = X.compute_actions(state, now)
     new += X.apply_actions(state, actions, now)
     drift_started = _drift_tick(p, state, actions, now)
@@ -332,7 +372,12 @@ def main(argv=None):
     s = sub.add_parser("rebuild"); s.set_defaults(fn=cmd_rebuild)
     s = sub.add_parser("drift"); s.add_argument("pr", type=int); s.set_defaults(fn=cmd_drift)
     a = ap.parse_args(argv)
-    return a.fn(Paths(a.dir), a)
+    p = Paths(a.dir)
+    if a.fn in (cmd_tick, cmd_decision):     # tick locks only around its writes; decision never touches state
+        return a.fn(p, a)
+    with S.locked(p.state):
+        return a.fn(p, a)
+
 
 
 if __name__ == "__main__":

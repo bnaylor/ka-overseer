@@ -109,3 +109,22 @@ def test_status_token_is_case_and_spacing_tolerant():
     r = parse_report("OVERSEER REPORT kube-agents-vamp-1\nstatus: waiting-human:q here\n")
     assert r["status"] == "waiting-human" and r["needs"] == "q here"
     assert parse_report("OVERSEER REPORT kube-agents-vamp-1\nstatus: waiting_bnaylor: q\n")["status"] == "waiting-human"
+
+
+def test_numbers_inside_parentheses_never_claim_a_pr():
+    r = parse_report("OVERSEER REPORT worker-a\n"
+                     "prs: #102 round 2 0-threads hold (merge order; clearance #103+#104 merged + rebase)\nstatus: working\n")
+    assert set(r["prs"]) == {102}
+    r = parse_report("OVERSEER REPORT worker-a\n"
+                     "prs: #110 round 2 0-threads no-hold threads fixed (docs; gap filed as #111 and linked), /review posted\n"
+                     "status: working\n")
+    assert set(r["prs"]) == {110}
+    r = parse_report("OVERSEER REPORT worker-a\n"
+                     "prs: #120 round 2 0-threads no-hold (decline; #121 is the planner's); #122 round 3 0-threads no-hold\n"
+                     "status: working\n")
+    assert set(r["prs"]) == {120, 122}
+
+
+def test_prs_unchanged_is_a_sentinel_not_an_empty_list():
+    r = parse_report("OVERSEER REPORT worker-a\nprs: unchanged (see last report)\nstatus: working\n")
+    assert r["prs"] is None
