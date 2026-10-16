@@ -57,6 +57,24 @@ def load_state(path):
 
 _ORPHAN_WHAT = re.compile(r"session gone, owns #(\d+)(?:, #\d+)*; reassign\?")
 _CONFLICT_WHAT = re.compile(r"#(\d+) reported by both (\S+) and (\S+); (\S+) now owner")
+# "lgtm wanted on #3, #4" / "approve + lgtm wanted on #5": one standing item per PR, so a session's next ask
+# can't overwrite it.  It clears when the PR merges, closes, or gets the lgtm label.
+_LGTM_ASK = re.compile(r"(?:approve\s*(?:\+|and|&)\s*)?lgtm\s+wanted\s+on\s+((?:#\d+[\s,&]*(?:and\s+)?)+)", re.I)
+
+
+def lgtm_asks(*texts):
+    """PR numbers named in every "lgtm wanted on #N[, #M]" phrase across the texts, in order, no repeats."""
+    out = []
+    for t in texts:
+        for m in _LGTM_ASK.finditer(t or ""):
+            for n in re.findall(r"#(\d+)", m.group(1)):
+                if int(n) not in out:
+                    out.append(int(n))
+    return out
+
+
+def _lgtm_what(n):
+    return f"lgtm wanted on #{n}"
 
 
 def _provably_auto(item, sessions):
@@ -73,6 +91,8 @@ def _provably_auto(item, sessions):
     if k == "waiting-human":
         row = sessions[s]
         return row["status"] == "waiting-human" and what == (row["needs"] or "waiting on the human")
+    if k == "lgtm-wanted":
+        return what == _lgtm_what(n)
     return True                   # sweep touches no other kind
 
 
@@ -216,7 +236,8 @@ def apply_report(state, report, now):
             p["last_owner_report"] = now
             p["owner_belief"] = {"rounds": belief["rounds"], "threads": belief["threads"], "hold": belief["hold"]}
     # attention for waiting-human
-    if row["status"] == "waiting-human":
+    only_lgtm = bool(row["needs"]) and not re.sub(r"[\s,;.&+]|and", "", _LGTM_ASK.sub("", row["needs"]))
+    if row["status"] == "waiting-human" and not only_lgtm:   # a pure lgtm ask lives in its own items below
         what = row["needs"] or "waiting on the human"
         named = re.search(r"#(\d+)", what)
         pr_number = int(named.group(1)) if named else (reported[0] if reported else None)
@@ -233,6 +254,13 @@ def apply_report(state, report, now):
             new.append(item)
     else:
         _clear_kind(state, name, "waiting-human")
+    for n in lgtm_asks(report.get("needs"), report.get("status_detail"), report.get("note")):
+        if snoozed(state, name, "lgtm-wanted", n):
+            continue
+        pr(state, n)                     # tracked, so the tick reads its labels and state
+        item = add_attention(state, name, "lgtm-wanted", n, _lgtm_what(n), now)
+        if item:
+            new.append(item)
     sweep(state, now)
     state["updated"] = now
     return new
@@ -363,6 +391,10 @@ def sweep(state, now):
             # widened: _raise_orphan rewrites it and notifies again
         elif item["kind"] == "gone-question" and item["pr"] is not None and _taken_over(state, item):
             state["attention"].remove(item)
+        elif item["kind"] == "lgtm-wanted" and item["pr"] is not None:
+            p = state["prs"].get(str(item["pr"])) or {}
+            if p.get("lgtm") or p.get("state") not in OPEN_PR_STATES:
+                state["attention"].remove(item)
 
 
 def apply_roster(state, roster, now):

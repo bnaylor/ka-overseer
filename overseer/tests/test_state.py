@@ -718,3 +718,57 @@ def test_a_back_by_report_session_is_live_for_escalation_and_render_helpers():
     assert not S.is_live(s, "kube-agents-a")
     S.apply_report(s, report("OVERSEER REPORT kube-agents-a\nprs: none\nstatus: working\n"), _at(6))
     assert S.is_live(s, "kube-agents-a") and s["sessions"]["kube-agents-a"]["roster_status"] == "gone"
+
+
+def _lgtm_ids(s):
+    return sorted(i["id"] for i in s["attention"] if i["kind"] == "lgtm-wanted")
+
+
+def test_lgtm_asks_become_standing_items_that_survive_the_next_ask():
+    s = S.empty_state()
+    new = S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: waiting-human: lgtm wanted on #10, #11\n"), T0)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:10", "worker-a:lgtm-wanted:11"]
+    assert {i["what"] for i in new} == {"lgtm wanted on #10", "lgtm wanted on #11"}
+    assert not any(i["kind"] == "waiting-human" for i in s["attention"])   # a pure lgtm ask: no duplicate item
+    assert "10" in s["prs"] and "11" in s["prs"]                              # tracked, so the tick reads them
+    # the next report asks something else: both lgtm items stay, the new ask gets its own item
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: waiting-human: OK to roll the image?\n"), T1)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:10", "worker-a:lgtm-wanted:11"]
+    assert any(i["kind"] == "waiting-human" and i["what"] == "OK to roll the image?" for i in s["attention"])
+    # and an idle report keeps them too
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: idle\n"), T1)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:10", "worker-a:lgtm-wanted:11"]
+
+
+def test_lgtm_ask_in_the_note_and_approve_form_are_read():
+    s = S.empty_state()
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: working\nnote: approve + lgtm wanted on #12 and #13\n"), T0)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:12", "worker-a:lgtm-wanted:13"]
+
+
+def test_lgtm_item_clears_on_lgtm_label_or_merge_only_for_that_pr():
+    s = S.empty_state()
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: waiting-human: lgtm wanted on #10, #11, #12\n"), T0)
+    s["prs"]["10"].update(state="OPEN", lgtm=True)       # what a tick snapshot writes
+    s["prs"]["11"].update(state="OPEN", lgtm=False)
+    s["prs"]["12"].update(state="MERGED", lgtm=False)
+    S.sweep(s, T1)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:11"]
+
+
+def test_mixed_ask_keeps_the_waiting_item_and_adds_lgtm_items():
+    s = S.empty_state()
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: waiting-human: OK to roll x; lgtm wanted on #20\n"), T0)
+    assert _lgtm_ids(s) == ["worker-a:lgtm-wanted:20"]
+    assert any(i["kind"] == "waiting-human" for i in s["attention"])
+
+
+def test_lgtm_items_survive_a_reload_as_auto(tmp_path: Path):
+    s = S.empty_state()
+    S.apply_report(s, report("OVERSEER REPORT worker-a\nprs: none\nstatus: waiting-human: lgtm wanted on #10\n"), T0)
+    for i in s["attention"]:
+        i.pop("manual", None)                             # an older state file has no manual flag
+    p = tmp_path / "state.json"
+    S.save_state(s, p)
+    again = S.load_state(p)
+    assert [i["manual"] for i in again["attention"] if i["kind"] == "lgtm-wanted"] == [False]
