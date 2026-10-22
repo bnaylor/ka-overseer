@@ -91,7 +91,7 @@ def parse_report(text):
             token, rest = (m2.group(1), m2.group(2)) if m2 else (value, "")
             r["status"] = token.lower().replace("_", "-")
             if r["status"].startswith("waiting-") and r["status"] != "waiting-review":
-                r["status"] = "waiting-human"          # waiting-brian, waiting-user, ... all mean the same stall
+                r["status"] = "waiting-human"          # waiting-alice, waiting-user, ... all mean the same stall
             rest = rest.strip()
             if r["status"] == "waiting-human":
                 r["needs"] = rest or None

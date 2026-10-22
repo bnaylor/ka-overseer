@@ -14,7 +14,7 @@ Approved in brainstorm 2026-10-01. Problem statement and brief: `overseer.md`.
 | Overseer driver | Self-paced loop. Fast while moving, slow when quiet, never stops. |
 | Rule relay | Numbered `rules.md` plus a RULE broadcast on change, acknowledged by number |
 | Design calls | Go to the human. Never routed to a peer session. Nothing blocked in one session is asked of another. |
-| Gating | `kube-agents-bot` reviews are the gating rounds and count toward the cap. `kyber775` is advisory, shown separately, never capped. |
+| Gating | Reviews by `gating_bot` are the gating rounds and count toward the cap. `advisory_bot` (optional) is advisory, shown separately, never capped. |
 | Gone sessions | Stay greyed while they own an open unclaimed PR; retire to history after 24 h once they own nothing, or when the human says |
 
 ## Spike learnings (2026-10-01, scratch session `overseer-spike`)
@@ -85,7 +85,7 @@ The three briefs in `auto/` gain one sentence: on start, report to the Overseer 
       "unresolved_threads": 0,
       "rounds": 5, "advisory_rounds": 0,
       "hold": false, "lgtm": false, "approved": true,
-      "reviewers": ["jayantid"],
+      "reviewers": ["reviewer-1"],
       "last_activity": "...", "last_owner_report": "...",
       "drift": null
     }
@@ -184,7 +184,7 @@ Notification: `osascript -e 'display notification "<session>: <what>" with title
 4. A `/hold` needs its reason and its clearance criterion in the same comment.
 5. Never push while a gating review round is in flight.
 6. Never lgtm the human's own PRs.
-7. `kyber775` is advisory. It does not gate and its findings do not count as rounds.
+7. The advisory bot (`advisory_bot` in `overseer/config.json`, if you run one) is advisory. It does not gate and its findings do not count as rounds.
 8. A finding whose fix is a new rule, a regex, or a design change goes to the human, not into the PR.
 9. Nothing blocked in your session is asked of a peer. Route it to the human via the Overseer.
 
@@ -253,8 +253,8 @@ preserving `owner`, `last_owner_report`, and `drift` inputs.
 
 Per PR: `gh pr view --json` for title, head, branch, mergeable, labels, reviews, comments,
 reviewRequests, statusCheckRollup, updatedAt; one GraphQL query for `reviewThreads` to count
-`isResolved == false`. `rounds` is the count of review submissions by `kube-agents-bot`;
-`advisory_rounds` the same for `kyber775`. `hold`, `lgtm`, `approved` come from labels.
+`isResolved == false`. `rounds` is the count of review submissions by `gating_bot`;
+`advisory_rounds` the same for `advisory_bot` (0 when none is configured). `hold`, `lgtm`, `approved` come from labels.
 `checks` is `red` if any rollup entry failed, `pending` if any is in progress, `green` if all
 passed, `none` if empty.
 
@@ -316,7 +316,7 @@ file path. New sessions get it from the listing.
 
 ## Verification before "done"
 
-- `gh_snapshot.py` on #2077 reports rounds equal to the count of `kube-agents-bot` reviews visible on the PR, and threads equal to the unresolved count on the GitHub page.
+- `gh_snapshot.py` on a real PR reports rounds equal to the count of gating-bot reviews visible on the PR, and threads equal to the unresolved count on the GitHub page.
 - A synthetic report parsed by the merge step produces the expected session row, and a report with `waiting-human` produces an attention item and exactly one notification.
 - `render.py` on a state with an empty attention list shows the green line; with one item other than a `gone-question` note, the red band.
 - One live INTRO to a real session returns a report in the schema.
