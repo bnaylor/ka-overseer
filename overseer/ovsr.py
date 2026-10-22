@@ -146,7 +146,9 @@ def _read_github(p, now):
     refresh_worktrees(work, now)
     changes = {}
     for k, row in work["prs"].items():
-        old = before.get(k, {})
+        # A PR first seen by this snapshot is diffed against a blank row, not {}: otherwise its default
+        # owner=None rides along and wipes a claim a report filed while GitHub was being read.
+        old = before.get(k) or S._pr_row()
         diff = {f: v for f, v in row.items() if old.get(f, _ABSENT) != v}
         if diff or k not in before:
             changes[k] = diff

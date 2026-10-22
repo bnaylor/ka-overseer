@@ -303,3 +303,21 @@ def test_a_report_filed_while_a_tick_reads_github_survives_the_tick(tmp_path, mo
     assert st["sessions"]["worker-a"]["prs"] == [7]               # the report was not saved over
     assert st["prs"]["7"]["owner"] == "worker-a"
     assert st["prs"]["8"]["mergeable"] == "MERGEABLE"             # and GitHub's results still landed
+
+
+def test_a_claim_on_a_pr_the_tick_first_sees_survives_the_tick(tmp_path, monkeypatch, capsys):
+    d = setup(tmp_path, monkeypatch)
+    (Path(d) / "roster.json").write_text(json.dumps({"ts": S.now_iso(), "sessions": []}))
+
+    def slow_snapshot(state, numbers, now):
+        monkeypatch.setattr("sys.stdin", io.StringIO("OVERSEER REPORT worker-a\nprs: #8 round 0 0-threads no-hold\nstatus: working\n"))
+        assert ovsr.main(["--dir", d, "report"]) == 0      # the owner claims #8 while GitHub is being read
+        S.pr(state, 8).update(state="OPEN", mergeable="MERGEABLE")    # #8 is new to the tick's copy
+        return {"errors": {}}
+
+    monkeypatch.setattr(ovsr.G, "scope_numbers", lambda state: [8])
+    monkeypatch.setattr(ovsr.G, "snapshot", slow_snapshot)
+    assert ovsr.main(["--dir", d, "tick", "--session", "overseer"]) == 0
+    st = S.load_state(Path(d) / "state.json")
+    assert st["prs"]["8"]["owner"] == "worker-a"                  # the blank row's owner=None didn't wipe the claim
+    assert st["prs"]["8"]["mergeable"] == "MERGEABLE"
