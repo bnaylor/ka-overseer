@@ -278,7 +278,7 @@ def test_idle_loop_session_without_prs_is_not_pinged():
     assert stalled
 
 
-HB = {"login": "reviewer-1", "at": "2026-10-01T18:10:00Z", "state": "COMMENTED", "snippet": "One item blocks the merge"}
+HB = {"login": "reviewer-1", "at": "2026-10-01T18:10:00Z", "state": "COMMENTED", "url": "https://github.com/acme/widget/pull/5"}
 
 
 def test_human_blocker_advises_once_after_the_bots_are_done():

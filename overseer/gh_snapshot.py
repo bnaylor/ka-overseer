@@ -93,18 +93,23 @@ def _rounds(reviews, login):
 
 # Accounts whose reviews are machine output or the operator's own sessions: never a human reviewer's word.
 NOT_HUMAN = {l for l in (GATING_BOT, ADVISORY_BOT, "github-actions", *CFG.get("non_human_reviewers", [])) if l}
+# Only reviewers with standing on the repo count; anyone else can comment, and their words are untrusted.
+TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 BLOCKING = re.compile(r"\bblock(s|ing|er|ers)?\b|\bmust\b|\bbefore (merge|merging|lgtm)\b", re.I)
 
 
 def human_blocker(pr):
     """The newest human review after the last commit that asks for changes: CHANGES_REQUESTED, or a
     COMMENTED review whose body says it blocks.  A body-only blocker has no thread, so the thread count
-    reads 0 and the owner would otherwise report the PR lgtm-ready."""
+    reads 0 and the owner would otherwise report the PR lgtm-ready.  Keeps no review text: the result
+    reaches an agent session, and quoting a reviewer's words there would be prompt injection."""
     last_commit = max((c.get("committedDate") or "" for c in pr.get("commits") or []), default="")
     found = None
     for r in pr.get("reviews") or []:
         login = (r.get("author") or {}).get("login") or ""
         if login in NOT_HUMAN or login.endswith("[bot]"):
+            continue
+        if r.get("authorAssociation") not in TRUSTED_ASSOCIATIONS:
             continue
         at = r.get("submittedAt") or ""
         if at <= last_commit:
@@ -112,7 +117,7 @@ def human_blocker(pr):
         body = r.get("body") or ""
         if r.get("state") == "CHANGES_REQUESTED" or (r.get("state") == "COMMENTED" and BLOCKING.search(body)):
             if found is None or at > found["at"]:
-                found = {"login": login, "at": at, "state": r.get("state"), "snippet": " ".join(body.split())[:160]}
+                found = {"login": login, "at": at, "state": r.get("state"), "url": pr.get("url")}
     return found
 
 
