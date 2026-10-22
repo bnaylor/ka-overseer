@@ -85,7 +85,6 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `briefs/` | the Overseer loop brief and the report-in sentence for other briefs |
 | `role-examples/` | starting prompts, permissions and lessons for the planner, minders, cluster manager and worktree cleanup |
 | `INSTALL.md` | step-by-step install for an agent pointed at this repo |
-| `tools/portify.py` | the transform that extracted this package from its origin repo, for the record |
 
 Runtime files the Overseer writes into `overseer/`: `state.json`, `reports.log` (append-only,
 rebuildable), `roster.json`, `dashboard.html`, `drift/`. They are git-ignored here; `reports.log` is

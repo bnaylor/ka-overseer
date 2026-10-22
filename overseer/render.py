@@ -196,7 +196,7 @@ def _pr_table(items):
             f"<td>{e(', '.join(p['reviewers']) or '—')}</td><td>{ts(p['last_activity'])}</td>"
             f"<td title=\"{e(p['drift'])}\">{L(p['drift'] or '')}</td></tr>")
     return ("<table><tr><th>PR</th><th>owner</th><th>mergeable</th><th>checks</th><th>threads</th><th>rounds</th>"
-            "<th>kyber</th><th>hold</th><th>lgtm</th><th>approved</th><th>reviewers</th><th>activity</th><th>drift</th></tr>"
+            "<th>advisory</th><th>hold</th><th>lgtm</th><th>approved</th><th>reviewers</th><th>activity</th><th>drift</th></tr>"
             + "".join(out) + "</table>")
 
 
