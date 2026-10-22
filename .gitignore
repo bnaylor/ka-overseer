@@ -9,3 +9,4 @@ overseer/dashboard.html
 overseer/OVERSEER
 overseer/decisions.log
 overseer/drift/
+overseer/config.json

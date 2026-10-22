@@ -32,7 +32,9 @@ python3 overseer/configure.py --repo <owner/name> --gating-bot <login> --advisor
 ./install.sh
 ```
 
-`configure.py` writes `overseer/config.json` (run it with `--show` first to preview).  Not on
+`configure.py` writes `overseer/config.json` (run it with `--show` first to preview).  That file
+is git-ignored, so later pulls never overwrite it; `overseer/config.example.json` shows every key.
+Set the gating bot: with none, no review counts as a round and the round cap never fires.  Not on
 macOS?  Add `--notify none`.  `install.sh` checks prerequisites (Python 3.11+, pytest, `gh` logged
 in, `claude` on PATH), links the skill into `~/.claude/skills/`, and runs the tests.  If it
 reports a missing prerequisite, tell the human the exact fix it printed and stop.

@@ -1,14 +1,13 @@
 {
-  "repo": "gke-labs/kube-agents",
+  "repo": "your-org/your-repo",
   "human": "the human",
   "human_short": "human",
-  "session_pattern": "^(kube-agents-|overseer)",
-  "gating_bot": "kube-agents-bot",
-  "advisory_bot": "kyber775",
+  "session_pattern": "^(worker-|planner|overseer)",
+  "gating_bot": "your-review-bot",
+  "advisory_bot": "",
   "round_cap": 6,
   "ignored_check_contexts": [
-    "tide",
-    "pull-kube-agents-smoke-test-next"
+    "tide"
   ],
   "scope_queries": {
     "mine": [
@@ -26,6 +25,6 @@
   },
   "notify": "osascript",
   "cwd_prefixes": [
-    "/Users/bnaylor/src/kube-agents"
+    "/path/to/your/checkouts"
   ]
 }
