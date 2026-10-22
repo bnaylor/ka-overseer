@@ -8,22 +8,22 @@ T0 = "2026-10-01T20:00:00Z"
 
 def sample():
     s = S.empty_state()
-    S.session(s, "kube-agents-vamp-1").update(role="pr-minder", theme="budget", driver="loop", cadence_min=30,
+    S.session(s, "worker-1").update(role="pr-minder", theme="budget", driver="loop", cadence_min=30,
                                              status="working", roster_status="busy", prs=[5], last_report=T0,
                                              last_activity=T0, rules_ack=9, note="fine")
-    S.session(s, "kube-agents-vamp-2").update(role="task", status="gone", roster_status="gone", gone_since=T0)
-    S.pr(s, 5).update(owner="kube-agents-vamp-1", title="fix thing", head="abcdef12", state="OPEN",
+    S.session(s, "worker-2").update(role="task", status="gone", roster_status="gone", gone_since=T0)
+    S.pr(s, 5).update(owner="worker-1", title="fix thing", head="abcdef12", state="OPEN",
                       mergeable="MERGEABLE", checks="green", unresolved_threads=0, rounds=6, advisory_rounds=1,
-                      hold=False, lgtm=False, approved=True, reviewers=["jay"], last_activity=T0,
-                      url="https://github.com/gke-labs/kube-agents/pull/5", drift="owner says rounds 5, GitHub 6")
-    S.pr(s, 6).update(owner="kube-agents-vamp-1", title="other", state="OPEN", checks="red",
+                      hold=False, lgtm=False, approved=True, reviewers=["reviewer-1"], last_activity=T0,
+                      url="https://github.com/example-org/widget/pull/5", drift="owner says rounds 5, GitHub 6")
+    S.pr(s, 6).update(owner="worker-1", title="other", state="OPEN", checks="red",
                       unresolved_threads=2, rounds=1, last_activity=T0)
     return s
 
 
 def test_a_gone_question_is_a_muted_note_not_the_red_band():
     s = sample()
-    S.add_attention(s, "kube-agents-vamp-2", "gone-question", None, "gone while waiting on you: ship it?", T0)
+    S.add_attention(s, "worker-2", "gone-question", None, "gone while waiting on you: ship it?", T0)
     html = V.render(s, None, T0)
     assert "Nothing is waiting on you" in html and 'class="attention red"' not in html
     assert 'class="attention note"' in html and "gone while waiting on you: ship it?" in html
@@ -31,10 +31,10 @@ def test_a_gone_question_is_a_muted_note_not_the_red_band():
 
 def test_a_session_back_by_report_is_not_rendered_gone():
     s = sample()
-    s["sessions"]["kube-agents-vamp-2"]["last_report"] = "2026-10-01T20:05:00Z"   # after gone_since T0
-    for roster in (None, [{"name": "kube-agents-vamp-1", "status": "busy"}]):
+    s["sessions"]["worker-2"]["last_report"] = "2026-10-01T20:05:00Z"   # after gone_since T0
+    for roster in (None, [{"name": "worker-1", "status": "busy"}]):
         html = V.render(s, roster, T0)
-        assert '<tr class="row gone"><td>kube-agents-vamp-2</td>' not in html
+        assert '<tr class="row gone"><td>worker-2</td>' not in html
 
 
 def test_empty_attention_shows_green_line():
@@ -45,8 +45,8 @@ def test_empty_attention_shows_green_line():
 
 def test_attention_band_lists_items_oldest_first():
     s = sample()
-    S.add_attention(s, "kube-agents-vamp-1", "waiting-human", 5, "second", "2026-10-01T19:00:00Z")
-    S.add_attention(s, "kube-agents-vamp-1", "waiting", None, "first", "2026-10-01T18:00:00Z")
+    S.add_attention(s, "worker-1", "waiting-human", 5, "second", "2026-10-01T19:00:00Z")
+    S.add_attention(s, "worker-1", "waiting", None, "first", "2026-10-01T18:00:00Z")
     html = V.render(s, None, T0)
     assert 'class="attention red"' in html
     assert html.index("first") < html.index("second")
@@ -54,7 +54,7 @@ def test_attention_band_lists_items_oldest_first():
 
 def test_sessions_and_prs_tables():
     html = V.render(sample(), None, T0)
-    assert "kube-agents-vamp-1" in html and "pr-minder" in html and "budget" in html
+    assert "worker-1" in html and "pr-minder" in html and "budget" in html
     assert 'class="row gone"' in html                          # gone session greyed
     assert 'class="cap"' in html                               # rounds 6 highlighted
     assert "owner says rounds 5, GitHub 6" in html
@@ -65,7 +65,7 @@ def test_sessions_and_prs_tables():
 
 def test_roster_overrides_status_column():
     s = sample()
-    html = V.render(s, [{"name": "kube-agents-vamp-1", "status": "waiting", "kind": "interactive", "started_at": T0}], T0)
+    html = V.render(s, [{"name": "worker-1", "status": "waiting", "kind": "interactive", "started_at": T0}], T0)
     assert "⏸ waiting" in html
 
 
@@ -86,15 +86,15 @@ def test_cli(tmp_path):
 
 def test_pr_numbers_are_links_everywhere():
     s = sample()
-    S.add_attention(s, "kube-agents-vamp-1", "waiting-human", 5, "file an issue for #1938's leftovers?", T0)
-    s["sessions"]["kube-agents-vamp-1"]["note"] = "tracks #1979 as stacked"
+    S.add_attention(s, "worker-1", "waiting-human", 5, "file an issue for #1938's leftovers?", T0)
+    s["sessions"]["worker-1"]["note"] = "tracks #1979 as stacked"
     html = V.render(s, None, T0)
     base = V.PR_URL.format(n="")
     assert f'<a href="{base}5">#5</a>' in html                 # sessions PRs column and attention PR column
     assert f'<a href="{base}1938">#1938</a>' in html            # inside the attention question
     assert f'<a href="{base}1979">#1979</a>' in html            # inside a note
     # text is still escaped around the links
-    s["sessions"]["kube-agents-vamp-1"]["note"] = "<b>#7</b>"
+    s["sessions"]["worker-1"]["note"] = "<b>#7</b>"
     html = V.render(s, None, T0)
     assert "&lt;b&gt;" in html and f'<a href="{base}7">#7</a>' in html
 
@@ -119,7 +119,7 @@ def test_humans_done_needs_every_signoff_and_no_hold():
 def test_session_rows_carry_the_full_note_for_the_hover_balloon():
     import render as V, state as S
     st = S.empty_state()
-    row = S.session(st, "kube-agents-vamp-99")
+    row = S.session(st, "worker-99")
     row.update(note="a very long note " * 10, status="working", role="task")
     out = V.render(st, None, "2026-10-07T00:00:00Z")
     assert 'data-note="a very long note' in out
