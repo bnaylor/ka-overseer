@@ -243,6 +243,10 @@ never removes one itself.
   - `check`: same as `cleanup` but something is unsaved or the worktree is locked, or the folder lost its git record. The human decides.
   - `missing`: git lists the worktree but the folder is gone; `git worktree prune` drops it.
   - `unknown`: git failed, the clone's remote is not on GitHub, or GitHub did not answer and no earlier tick knew the PR.
+- **Keep list.** `overseer/worktree-keep.json` (gitignored; copy `overseer/worktree-keep.example.json`)
+  maps a worktree path to a reason. A listed worktree that would be `cleanup` or `check` shows
+  `in use` with `kept: <reason>` instead, so long-lived checkouts are never offered for removal.
+  `~` expands; paths compare after resolving symlinks. No file means nothing is kept.
 - The tick's summary line counts `cleanup` plus `missing` as worktrees to clean up.
 
 ## GitHub snapshot (`gh_snapshot.py`)

@@ -77,6 +77,7 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `overseer/render.py` | state to dashboard |
 | `overseer/drift.py`, `overseer/drift-prompt.md` | a PR past the round cap gets a read-only `claude -p` drift review (once per head); the verdict lands as attention. The Overseer fetches the PR history itself; the agent gets Read/Grep/Glob over that bundle and nothing else |
 | `overseer/config.json`, `overseer/configure.py` | deployment settings, and the flag-driven writer for them |
+| `overseer/worktree-keep.example.json` | shape of the optional `worktree-keep.json`: worktrees the dashboard must never offer for removal |
 | `overseer/tests/` | `python3 -m pytest overseer/tests -q` |
 | `docs/` | design, protocol, rules, escalation, original brief |
 | `skills/working-with-the-overseer/` | the skill other sessions load |

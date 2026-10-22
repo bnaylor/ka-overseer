@@ -370,3 +370,19 @@ def test_a_non_github_remote_is_unknown_not_no_pr(ws):
 def test_parse_status_z_skips_rename_sources():
     text = "R  new name.txt\0old name.txt\0?? dir/ü.py\0!! .env\0"
     assert W.parse_status_z(text) == [("R ", "new name.txt"), ("??", "dir/ü.py"), ("!!", ".env")]
+
+
+def test_a_kept_worktree_is_never_offered_for_removal(ws, tmp_path):
+    keep = tmp_path / "keep.json"
+    keep.write_text(json.dumps({str(ws["root"] / "widget-merged"): "durable checkout",
+                                str(ws["root"] / "widget-dirty"): "owner keeps it"}))
+    find = fake_prs(ws, {"feat/merged": (1, "MERGED"), "feat/dirty": (2, "MERGED")})
+    rows = by_name(W.refresh(S.empty_state(), NOW, find, roots=[str(ws["root"])], keep_path=str(keep)))
+    assert rows["widget-merged"]["status"] == "in use" and rows["widget-merged"]["why"] == "kept: durable checkout"
+    assert rows["widget-dirty"]["status"] == "in use"              # a check row is kept too
+    assert rows["scratch"]["status"] == "cleanup"                  # unlisted rows are unchanged
+
+
+def test_the_example_keep_file_parses():
+    keep = W.load_keep(os.path.join(os.path.dirname(W.__file__), "worktree-keep.example.json"))
+    assert keep and all(os.path.isabs(k) for k in keep)

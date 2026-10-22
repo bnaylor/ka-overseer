@@ -2,6 +2,7 @@
 
 Read-only: nothing here removes a worktree. git runs here; gh runs in gh_snapshot.py.
 """
+import json
 import os
 import re
 import subprocess
@@ -289,12 +290,27 @@ def classify(row, now):
     return "cleanup", f"{reason}; nothing unsaved"
 
 
-def refresh(state, now, find_prs, roots=None):
+KEEP_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "worktree-keep.json")
+
+
+def load_keep(path=None):
+    """{realpath: reason} for worktrees an owner said to keep (durable checkouts and the like).
+    A missing file means nothing is kept; see worktree-keep.example.json for the shape."""
+    try:
+        with open(path or KEEP_FILE) as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        return {}
+    return {os.path.realpath(os.path.expanduser(k)): v for k, v in raw.items()}
+
+
+def refresh(state, now, find_prs, roots=None, keep_path=None):
     """Scan, attach PRs, owners and status, and store the result in state["worktrees"]. Returns the rows.
 
     find_prs(rows) -> ({(repo, branch): pr}, {repo or (repo, branch): error}); see gh_snapshot.branch_prs.
     """
     rows, errors = scan(default_roots() if roots is None else roots)
+    keep = load_keep(keep_path)
     previous = {(r["path"], r["branch"]): r.get("pr") for r in (state.get("worktrees") or {}).get("rows", [])}
     prs, pr_errors = find_prs([r for r in rows if r["branch"] and r["repo"]])
     for r in rows:
@@ -319,6 +335,9 @@ def refresh(state, now, find_prs, roots=None):
         r["live_here"] = sorted(n for n, s in state["sessions"].items() if S.is_live(state, n) and _under(s.get("cwd") or "", r["path"]))
         r["owner"] = owner_of(state, r)
         r["status"], r["why"] = classify(r, now)
+        kept = keep.get(os.path.realpath(r["path"]))
+        if kept and r["status"] in ("check", "cleanup"):   # an owner said it stays; never offer it for removal
+            r["status"], r["why"] = "in use", f"kept: {kept}"
     rows.sort(key=lambda r: (STATUS_ORDER.index(r["status"]), r["path"]))
     pr_msgs = [f"{k if isinstance(k, str) else ' '.join(k)}: {v}" for k, v in pr_errors.items()]
     state["worktrees"] = {"scanned": now, "rows": rows, "errors": errors + pr_msgs}
