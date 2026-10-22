@@ -239,3 +239,40 @@ def test_review_minder_is_not_pinged_for_another_authors_conflict():
     s["prs"]["5"].update(mergeable="CONFLICTING")
     s["sessions"]["kube-agents-vamp-1"]["role"] = "review-minder"
     assert types(X.compute_actions(s, T_PLUS_70M), "PING") == []
+
+
+def _owner(s):
+    return next(iter(s["sessions"].values()))
+
+
+def test_draft_pr_gets_no_reviewer_advice():
+    s = base()
+    s["prs"]["5"].update(reviewers=[], last_activity=T0, draft=True)
+    _owner(s)["status"] = "waiting-review"
+    assert types(X.compute_actions(s, T_PLUS_2D), "ADVICE") == []
+
+
+def test_draft_pr_conflict_is_not_pinged():
+    s = base()
+    s["prs"]["5"].update(mergeable="CONFLICTING", draft=True, last_activity=T0)
+    _owner(s)["last_report"] = T0
+    assert [a for a in types(X.compute_actions(s, T_PLUS_3H), "PING") if a["kind"] == "conflict"] == []
+
+
+def test_draft_pr_red_is_not_pinged():
+    s = base()
+    s["prs"]["5"].update(checks="red", draft=True, last_activity=T0)
+    _owner(s)["last_report"] = T0
+    assert [a for a in types(X.compute_actions(s, T_PLUS_3H), "PING") if a["kind"] == "red"] == []
+
+
+def test_idle_loop_session_without_prs_is_not_pinged():
+    s = base()
+    row = _owner(s)
+    row.update(prs=[], driver="loop")
+    del s["prs"]["5"]
+    stalled = [a for a in X.compute_actions(s, T_PLUS_3H) if a["kind"] == "stalled"]
+    assert stalled == []
+    row["driver"] = "manual"
+    stalled = [a for a in X.compute_actions(s, T_PLUS_3H) if a["kind"] == "stalled"]
+    assert stalled

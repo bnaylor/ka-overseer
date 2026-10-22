@@ -7,7 +7,7 @@ from gh_snapshot import ROUND_CAP
 SILENT_FACTOR = 2
 THREADS_HOURS = 2
 RED_HOURS = 1
-CONFLICT_HOURS = 1        # a conflict blocks merge as hard as a red (rule 22); held PRs included, they must stay merge-ready
+CONFLICT_HOURS = 1        # a conflict blocks merge as hard as a red (rule 22); held PRs included, they must stay merge-ready (drafts aren't)
 NO_REVIEWER_HOURS = 24
 INTRO_GRACE_MIN = 5          # short-lived sessions come and go; do not INTRO until one has lived this long
 SKIP_PING = {"waiting"}          # gone sessions never reach the ladder: compute_actions skips them
@@ -75,11 +75,11 @@ def compute_actions(state, now, default_cadence_min=30):
                                   and S.parse_iso(p["last_activity"]) > S.parse_iso(anchor))
             if pinged_this_pass:
                 continue
-            if p.get("checks") == "red" and moved is not None and moved >= timedelta(hours=RED_HOURS) \
+            if p.get("checks") == "red" and not p.get("draft") and moved is not None and moved >= timedelta(hours=RED_HOURS) \
                     and silent is not None and silent >= timedelta(hours=RED_HOURS):
                 _escalate(state, now, name, row, num, "red", f"#{num} red for over {RED_HOURS}h, owner silent", actions)
                 pinged_this_pass = True
-            elif p.get("mergeable") == "CONFLICTING" and silent is not None \
+            elif p.get("mergeable") == "CONFLICTING" and not p.get("draft") and silent is not None \
                     and silent >= timedelta(hours=CONFLICT_HOURS) and row.get("role") != "review-minder":
                 _escalate(state, now, name, row, num, "conflict",
                           f"#{num} conflicts with main, owner silent {CONFLICT_HOURS}h+; merge main (rule 22)", actions)
@@ -99,12 +99,14 @@ def compute_actions(state, now, default_cadence_min=30):
                 _escalate(state, now, name, row, num, "stalled",
                           f"#{num} moved since your last report and you have been silent {int(silent.total_seconds() // 60)}m", actions)
                 pinged_this_pass = True
-            if row["status"] == "waiting-review" and not p.get("reviewers") and not p.get("lgtm") and moved is not None \
+            if row["status"] == "waiting-review" and not p.get("reviewers") and not p.get("lgtm") and not p.get("draft") \
+                    and moved is not None \
                     and moved >= timedelta(hours=NO_REVIEWER_HOURS):
                 if not _open(state, name, "no-reviewer", num) and not S.snoozed(state, name, "no-reviewer", num):
                     actions.append(_action("ADVICE", name, num, "no-reviewer",
                                            f"#{num} parked waiting-review with no reviewer for a day; a reviewer auto-assigns only after a clean bot round, so check the latest round is clean and otherwise ask the human"))
         if not owned and row["roster_status"] == "idle" and row["status"] == "working" \
+                and not str(row.get("driver") or "").startswith("loop") \
                 and silent is not None and silent >= SILENT_FACTOR * cadence:
             _escalate(state, now, name, row, None, "stalled", "roster idle but last report said working", actions)
     return actions
