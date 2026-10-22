@@ -3,6 +3,7 @@ import re
 
 HEAD = re.compile(r"^OVERSEER REPORT\s+(\S+)\s*$", re.M)
 PR_ITEM = re.compile(r"#(\d+)\s*(.*)")
+ITEM_AFTER_PERIOD = re.compile(r"\.\s+#\d+\s+(round|draft|merged)\b", re.I)
 ROUNDS = re.compile(r"\bround\s+(\d+)\b")
 THREADS = re.compile(r"\b(\d+)[\s-]threads?\b")
 DRIVER = re.compile(r"^(loop|goal|manual)(?:/(\d+)m)?\b")
@@ -24,12 +25,14 @@ UNCHANGED = None   # `prs: unchanged`: keep the session's last list (apply_repor
 def _top_level_fragments(line):
     """Split on ';' outside parentheses: '(green; #12 merged)' is free text, never a new item."""
     frags, depth, cur = [], 0, []
-    for ch in line:
+    for i, ch in enumerate(line):
         if ch == "(":
             depth += 1
         elif ch == ")":
             depth = max(0, depth - 1)
-        if ch == ";" and depth == 0:
+        # '. #N round|draft|merged' also starts an item: sessions keep writing a period where ';' belongs.
+        # The keyword keeps prose like '. #12 lands first' from claiming a PR it only mentions.
+        if (ch == ";" or (ch == "." and ITEM_AFTER_PERIOD.match(line, i))) and depth == 0:
             frags.append("".join(cur))
             cur = []
         else:

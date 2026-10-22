@@ -128,3 +128,18 @@ def test_numbers_inside_parentheses_never_claim_a_pr():
 def test_prs_unchanged_is_a_sentinel_not_an_empty_list():
     r = parse_report("OVERSEER REPORT worker-a\nprs: unchanged (see last report)\nstatus: working\n")
     assert r["prs"] is None
+
+
+def test_period_before_a_pr_item_starts_a_new_item():
+    r = parse_report("OVERSEER REPORT worker-a\n"
+                     "prs: #130 round 0 0-threads no-hold DRAFT, re-synced at 952be83d. #131 round 0 0-threads no-hold DRAFT (#129 piece 2), stacked on #130\n"
+                     "status: working\n")
+    assert set(r["prs"]) == {130, 131}
+    assert r["prs"][131]["rounds"] == 0
+
+
+def test_period_before_a_mentioned_pr_does_not_claim_it():
+    r = parse_report("OVERSEER REPORT worker-a\n"
+                     "prs: #140 round 1 0-threads no-hold waits on review. #141 lands with it\n"
+                     "status: working\n")
+    assert set(r["prs"]) == {140}
