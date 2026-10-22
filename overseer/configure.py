@@ -1,6 +1,7 @@
 """Write overseer/config.json from flags, so an installing agent never hand-edits JSON.
 
     python3 overseer/configure.py --repo owner/name [--gating-bot LOGIN] [--advisory-bot LOGIN|""]
+        [--non-human-reviewer LOGIN ...]
         [--session-pattern REGEX] [--cwd-prefix PATH ...] [--human "Name"] [--round-cap N]
         [--notify osascript|none] [--show]
 
@@ -28,6 +29,8 @@ def build(args, current):
         cfg["gating_bot"] = args.gating_bot
     if args.advisory_bot is not None:
         cfg["advisory_bot"] = args.advisory_bot
+    if args.non_human_reviewer is not None:
+        cfg["non_human_reviewers"] = [l for l in args.non_human_reviewer if l]
     if args.session_pattern is not None:
         re.compile(args.session_pattern)          # fail now, not on the first tick
         cfg["session_pattern"] = args.session_pattern
@@ -48,6 +51,7 @@ def main(argv=None, path=PATH):
     ap.add_argument("--repo")
     ap.add_argument("--gating-bot")
     ap.add_argument("--advisory-bot")
+    ap.add_argument("--non-human-reviewer", action="append")
     ap.add_argument("--session-pattern")
     ap.add_argument("--cwd-prefix", action="append")
     ap.add_argument("--human")

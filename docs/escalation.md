@@ -9,11 +9,12 @@ Signals checked each tick for sessions that have not self-reported:
 | --- | --- | --- |
 | Roster `waiting` (parked on a question or prompt) | immediate, by `watch.sh` | attention item, one notification; Overseer adds the PR context on its next tick |
 | Silent while an owned PR moved | past 2x stated cadence | PING with idle subscription, ladder 1 |
-| Roster idle but last report said working | one tick | PING, ladder 1 |
+| Roster idle but last report said working, no open PR, driver not `loop` | one tick | PING, ladder 1 |
 | Gone from roster while owning open PRs | immediate | attention item "orphan", offer reassignment |
 | Unresolved threads untouched, owner silent | 2 h | PING; attention after one more tick |
-| Red check | 1 h | PING; attention after one more tick |
-| Parked waiting-review, no reviewer assigned | 1 day | ADVICE (request review); attention after one more tick |
+| Red check (not on a draft) | 1 h | PING; attention after one more tick |
+| Parked waiting-review, no reviewer assigned (not a draft) | 1 day | ADVICE (request review); attention after one more tick |
+| A human review after the last push requests changes, or its body reads as blocking (`block`, `must`, `before merge`), and has no thread; owner reports waiting-review or a reviewer is assigned; not a draft | immediate | ADVICE `human-review`, once per review. Bots (`gating_bot`, `advisory_bot`, `github-actions`, `*[bot]`) and the logins in `non_human_reviewers` are not human |
 | Gating rounds | 6 or more | STOP, attention item "drift check" |
 
 Ladder for a non-reporting session: PING with an idle subscription (1) → next tick PING

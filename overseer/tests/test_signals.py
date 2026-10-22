@@ -276,3 +276,30 @@ def test_idle_loop_session_without_prs_is_not_pinged():
     row["driver"] = "manual"
     stalled = [a for a in X.compute_actions(s, T_PLUS_3H) if a["kind"] == "stalled"]
     assert stalled
+
+
+HB = {"login": "reviewer-1", "at": "2026-10-01T18:10:00Z", "state": "COMMENTED", "snippet": "One item blocks the merge"}
+
+
+def test_human_blocker_advises_once_after_the_bots_are_done():
+    s = base()
+    s["prs"]["5"].update(human_blocker=HB, reviewers=["reviewer-1"])
+    acts = [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"]
+    assert len(acts) == 1 and "reviewer-1" in acts[0]["reason"]
+    X.apply_actions(s, acts, T0)
+    assert [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"] == []   # once per review
+
+
+def test_human_blocker_waits_for_the_bots():
+    s = base()
+    s["prs"]["5"].update(human_blocker=HB, reviewers=[])
+    _owner(s)["status"] = "working"
+    assert [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"] == []
+    _owner(s)["status"] = "waiting-review"
+    assert [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"]
+
+
+def test_human_blocker_on_a_draft_is_not_advised():
+    s = base()
+    s["prs"]["5"].update(human_blocker=HB, reviewers=["reviewer-1"], draft=True)
+    assert [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"] == []

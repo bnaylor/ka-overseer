@@ -11,6 +11,9 @@ DEFAULTS = {
     "worktree_roots": [],          # folders whose git clones' worktrees the dashboard lists; empty means cwd_prefixes
     "gating_bot": "kube-agents-bot",
     "advisory_bot": "kyber775",
+    # logins whose reviews never count as a human reviewer's word, on top of the two bots above,
+    # github-actions and any login ending in [bot]: e.g. the account your own sessions post as
+    "non_human_reviewers": [],
     "round_cap": 6,
     "ignored_check_contexts": ["tide", "pull-kube-agents-smoke-test-next"],
     "scope_queries": {

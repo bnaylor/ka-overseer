@@ -37,3 +37,9 @@ def test_cwd_prefixes_expand_home(tmp_path):
     p = tmp_path / "config.json"
     configure.main(["--repo", "a/b", "--cwd-prefix", "~/src/widgets"], path=p)
     assert not json.loads(p.read_text())["cwd_prefixes"][0].startswith("~")
+
+
+def test_non_human_reviewers_flag_replaces_the_list(tmp_path):
+    p = tmp_path / "config.json"
+    configure.main(["--repo", "a/b", "--non-human-reviewer", "ops-account", "--non-human-reviewer", "other-bot"], path=p)
+    assert json.loads(p.read_text())["non_human_reviewers"] == ["ops-account", "other-bot"]

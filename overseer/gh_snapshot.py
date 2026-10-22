@@ -1,6 +1,7 @@
 """The only place gh is called. Writes the prs part of state.json and looks up PRs for worktree branches."""
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -90,6 +91,31 @@ def _rounds(reviews, login):
     return n
 
 
+# Accounts whose reviews are machine output or the operator's own sessions: never a human reviewer's word.
+NOT_HUMAN = {l for l in (GATING_BOT, ADVISORY_BOT, "github-actions", *CFG.get("non_human_reviewers", [])) if l}
+BLOCKING = re.compile(r"\bblock(s|ing|er|ers)?\b|\bmust\b|\bbefore (merge|merging|lgtm)\b", re.I)
+
+
+def human_blocker(pr):
+    """The newest human review after the last commit that asks for changes: CHANGES_REQUESTED, or a
+    COMMENTED review whose body says it blocks.  A body-only blocker has no thread, so the thread count
+    reads 0 and the owner would otherwise report the PR lgtm-ready."""
+    last_commit = max((c.get("committedDate") or "" for c in pr.get("commits") or []), default="")
+    found = None
+    for r in pr.get("reviews") or []:
+        login = (r.get("author") or {}).get("login") or ""
+        if login in NOT_HUMAN or login.endswith("[bot]"):
+            continue
+        at = r.get("submittedAt") or ""
+        if at <= last_commit:
+            continue
+        body = r.get("body") or ""
+        if r.get("state") == "CHANGES_REQUESTED" or (r.get("state") == "COMMENTED" and BLOCKING.search(body)):
+            if found is None or at > found["at"]:
+                found = {"login": login, "at": at, "state": r.get("state"), "snippet": " ".join(body.split())[:160]}
+    return found
+
+
 def classify_pr(pr, unresolved):
     labels = {l["name"] for l in pr.get("labels", [])}
     reviews = pr.get("reviews", [])
@@ -111,6 +137,7 @@ def classify_pr(pr, unresolved):
         "reviewers": [r.get("login") or r.get("name") for r in pr.get("reviewRequests", [])],
         "last_activity": last_activity(pr),
         "updated_at": pr.get("updatedAt"),
+        "human_blocker": human_blocker(pr),
     }
 
 

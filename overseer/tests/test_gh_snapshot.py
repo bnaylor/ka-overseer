@@ -178,3 +178,31 @@ def test_snapshot_skips_the_wait_when_nothing_is_unknown():
     waits = []
     G.snapshot(s, {2077}, lambda n: {**FIX, "state": "OPEN", "mergeable": "MERGEABLE"}, lambda n: 0, T0, sleep=waits.append)
     assert waits == [] and s["prs"]["2077"]["mergeable"] == "MERGEABLE"
+
+
+def test_human_blocker_finds_a_body_only_block_after_the_last_commit():
+    pr = {"commits": [{"committedDate": "2026-10-20T10:00:00Z"}],
+          "reviews": [{"author": {"login": G.GATING_BOT}, "state": "COMMENTED", "submittedAt": "2026-10-21T00:00:00Z", "body": "blocks"},
+                      {"author": {"login": "alice"}, "state": "COMMENTED", "submittedAt": "2026-10-19T00:00:00Z", "body": "blocks"},
+                      {"author": {"login": "alice"}, "state": "COMMENTED", "submittedAt": "2026-10-21T14:53:35Z", "body": "One item blocks the merge"}]}
+    hb = G.human_blocker(pr)
+    assert hb["login"] == "alice" and hb["at"] == "2026-10-21T14:53:35Z"
+    pr["reviews"][2]["body"] = "Looks good, nice work"
+    assert G.human_blocker(pr) is None                            # a friendly comment is not a blocker
+    pr["reviews"][2]["state"] = "CHANGES_REQUESTED"
+    assert G.human_blocker(pr) is not None
+
+
+def test_human_blocker_skips_bots_and_configured_non_humans(monkeypatch):
+    def review(login):
+        return {"commits": [], "reviews": [{"author": {"login": login}, "state": "CHANGES_REQUESTED",
+                                            "submittedAt": "2026-10-21T00:00:00Z", "body": "must fix"}]}
+    assert G.human_blocker(review("renovate[bot]")) is None
+    assert G.human_blocker(review("github-actions")) is None
+    assert G.human_blocker(review("operator-account")) is not None
+    monkeypatch.setattr(G, "NOT_HUMAN", G.NOT_HUMAN | {"operator-account"})   # config non_human_reviewers
+    assert G.human_blocker(review("operator-account")) is None
+
+
+def test_classify_pr_carries_the_human_blocker():
+    assert "human_blocker" in G.classify_pr(FIX, 0)

@@ -99,6 +99,13 @@ def compute_actions(state, now, default_cadence_min=30):
                 _escalate(state, now, name, row, num, "stalled",
                           f"#{num} moved since your last report and you have been silent {int(silent.total_seconds() // 60)}m", actions)
                 pinged_this_pass = True
+            hb = p.get("human_blocker")
+            bots_done = row["status"] == "waiting-review" or bool(p.get("reviewers"))   # only look once the bots are through
+            if hb and bots_done and not p.get("draft") and p.get("human_blocker_sent") != hb["at"]:
+                actions.append({**_action("ADVICE", name, num, "human-review",
+                                          f"#{num}: {hb['login']} left a {hb['state']} review after your last push that reads as blocking "
+                                          f"and has no thread (\"{hb['snippet']}\"). Read the review body and reply on the PR before reporting it lgtm-ready"),
+                                "at": hb["at"]})
             if row["status"] == "waiting-review" and not p.get("reviewers") and not p.get("lgtm") and not p.get("draft") \
                     and moved is not None \
                     and moved >= timedelta(hours=NO_REVIEWER_HOURS):
@@ -120,6 +127,8 @@ def apply_actions(state, actions, now):
             row["last_poke"] = now
             if a["type"] == "PING":
                 row["ladder"] = a["ladder"]
+        if a.get("kind") == "human-review" and a.get("pr") is not None:
+            S.pr(state, a["pr"])["human_blocker_sent"] = a["at"]     # once per review, not once per tick
         if a["type"] == "ATTENTION":
             item = S.add_attention(state, a["session"], a["kind"], a["pr"], a["reason"], now)
             if item:
