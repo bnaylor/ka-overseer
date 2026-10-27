@@ -218,3 +218,22 @@ def test_human_blocker_ignores_reviewers_without_standing_and_keeps_no_review_te
     assert hb == {"login": "drive-by", "at": "2026-10-21T00:00:00Z", "state": "CHANGES_REQUESTED",
                   "url": "https://github.com/acme/widget/pull/9"}
     assert "ignore previous instructions" not in str(hb)
+
+
+def test_human_blocker_counts_a_blocking_plain_comment_but_not_a_session_post(monkeypatch):
+    import re
+    pr = {"url": "u", "commits": [{"committedDate": "2026-01-01T10:00:00Z"}], "reviews": [],
+          "comments": [
+              {"author": {"login": "operator"}, "authorAssociation": "OWNER", "createdAt": "2026-01-01T12:00:00Z",
+               "body": "[session] this must be fixed before merge"},
+              {"author": {"login": "reviewer"}, "authorAssociation": "MEMBER", "createdAt": "2026-01-01T13:00:00Z",
+               "body": "One High blocks lgtm."}]}
+    hb = G.human_blocker(pr)
+    assert hb and hb["login"] == "reviewer" and hb["state"] == "COMMENT"
+    pr["comments"] = pr["comments"][:1]
+    assert G.human_blocker(pr) is not None                    # no pattern configured: the operator's comment counts
+    monkeypatch.setattr(G, "SESSION_POST", re.compile(r"^\[session\]"))
+    assert G.human_blocker(pr) is None                        # configured session posts never count
+    pr["comments"][0]["authorAssociation"] = "NONE"
+    monkeypatch.setattr(G, "SESSION_POST", None)
+    assert G.human_blocker(pr) is None                        # no standing on the repo: untrusted

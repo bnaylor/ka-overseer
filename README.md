@@ -48,7 +48,8 @@ and does the rest.
    --advisory-bot <login or ""> --session-pattern '<regex>' [--cwd-prefix <path>] [--human "<name>"]`.
    It writes `overseer/config.json`; edit that directly for anything else (round cap, ignored
    check contexts, scope queries, `non_human_reviewers`: logins whose reviews never count as a
-   human's, such as the account your sessions post as).
+   human's, such as the account your sessions post as; `session_post_pattern`: a regex for comments
+   your sessions post under a human's account, so they never read as a reviewer blocking).
 3. `./install.sh` checks prerequisites, symlinks the skill into `~/.claude/skills/` so every
    session can see it, and runs the test suite.
 4. In a spare terminal: `zsh overseer/watch.sh`.

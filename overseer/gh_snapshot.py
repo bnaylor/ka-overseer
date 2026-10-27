@@ -95,12 +95,13 @@ def _rounds(reviews, login):
 NOT_HUMAN = {l for l in (GATING_BOT, ADVISORY_BOT, "github-actions", *CFG.get("non_human_reviewers", [])) if l}
 # Only reviewers with standing on the repo count; anyone else can comment, and their words are untrusted.
 TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+SESSION_POST = re.compile(CFG["session_post_pattern"]) if CFG.get("session_post_pattern") else None
 BLOCKING = re.compile(r"\bblock(s|ing|er|ers)?\b|\bmust\b|\bbefore (merge|merging|lgtm)\b", re.I)
 
 
 def human_blocker(pr):
-    """The newest human review after the last commit that asks for changes: CHANGES_REQUESTED, or a
-    COMMENTED review whose body says it blocks.  A body-only blocker has no thread, so the thread count
+    """The newest human review or PR comment after the last commit that asks for changes: CHANGES_REQUESTED,
+    or a COMMENTED review or plain comment whose body says it blocks.  A body-only blocker has no thread, so the thread count
     reads 0 and the owner would otherwise report the PR lgtm-ready.  Keeps no review text: the result
     reaches an agent session, and quoting a reviewer's words there would be prompt injection."""
     last_commit = max((c.get("committedDate") or "" for c in pr.get("commits") or []), default="")
@@ -118,6 +119,19 @@ def human_blocker(pr):
         if r.get("state") == "CHANGES_REQUESTED" or (r.get("state") == "COMMENTED" and BLOCKING.search(body)):
             if found is None or at > found["at"]:
                 found = {"login": login, "at": at, "state": r.get("state"), "url": pr.get("url")}
+    # A reviewer can also block in a plain PR comment, which has no review state and no thread.
+    for c in pr.get("comments") or []:
+        login = (c.get("author") or {}).get("login") or ""
+        if login in NOT_HUMAN or login.endswith("[bot]"):
+            continue
+        at = c.get("createdAt") or ""
+        if at <= last_commit or c.get("authorAssociation") not in TRUSTED_ASSOCIATIONS:
+            continue
+        body = c.get("body") or ""
+        if (SESSION_POST and SESSION_POST.search(body)) or not BLOCKING.search(body):
+            continue
+        if found is None or at > found["at"]:
+            found = {"login": login, "at": at, "state": "COMMENT", "url": pr.get("url")}
     return found
 
 

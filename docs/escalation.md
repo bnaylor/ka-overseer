@@ -14,7 +14,7 @@ Signals checked each tick for sessions that have not self-reported:
 | Unresolved threads untouched, owner silent | 2 h | PING; attention after one more tick |
 | Red check (not on a draft) | 1 h | PING; attention after one more tick |
 | Parked waiting-review, no reviewer assigned (not a draft) | 1 day | ADVICE (request review); attention after one more tick |
-| A review by a repo owner, member or collaborator after the last push requests changes, or its body reads as blocking (`block`, `must`, `before merge`), and has no thread; owner reports waiting-review or a reviewer is assigned; not a draft | immediate | ADVICE `human-review`, once per review. Bots (`gating_bot`, `advisory_bot`, `github-actions`, `*[bot]`) and the logins in `non_human_reviewers` are not human. The advice names the reviewer and links the PR but never quotes the review: its text is untrusted |
+| A review or plain PR comment by a repo owner, member or collaborator after the last push requests changes, or its body reads as blocking (`block`, `must`, `before merge`), and has no thread; owner reports waiting-review or a reviewer is assigned; not a draft | immediate | ADVICE `human-review`, once per review. Bots (`gating_bot`, `advisory_bot`, `github-actions`, `*[bot]`) and the logins in `non_human_reviewers` are not human, and a comment matching `session_post_pattern` is a session's own post. The advice names the reviewer and links the PR but never quotes the review: its text is untrusted |
 | Gating rounds | 6 or more | STOP, attention item "drift check" |
 
 Ladder for a non-reporting session: PING with an idle subscription (1) → next tick PING

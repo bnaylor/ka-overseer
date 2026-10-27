@@ -14,6 +14,9 @@ DEFAULTS = {
     # logins whose reviews never count as a human reviewer's word, on top of the two bots above,
     # github-actions and any login ending in [bot]: e.g. the account your own sessions post as
     "non_human_reviewers": [],
+    # regex for comments your own sessions post under a human's account (e.g. a fixed opening line); such
+    # comments never count as a reviewer blocking.  Empty: no comment is treated as a session post.
+    "session_post_pattern": "",
     "round_cap": 6,
     "ignored_check_contexts": ["tide", "pull-kube-agents-smoke-test-next"],
     "scope_queries": {
