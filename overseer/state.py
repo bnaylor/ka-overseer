@@ -135,7 +135,7 @@ def _pr_row():
             "approved": None, "reviewers": [], "last_activity": None, "updated_at": None,
             "last_owner_report": None, "owner_belief": None, "drift": None,
             "snapshot_error": None, "hazards": None, "pending_orphan": False, "scopes": None,
-            "human_blocker": None, "human_blocker_sent": None}
+            "human_blocker": None, "human_blocker_sent": None, "no_reviewer_sent": None}
 
 
 def session(state, name):

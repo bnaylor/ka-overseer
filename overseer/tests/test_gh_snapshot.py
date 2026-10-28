@@ -237,3 +237,29 @@ def test_human_blocker_counts_a_blocking_plain_comment_but_not_a_session_post(mo
     pr["comments"][0]["authorAssociation"] = "NONE"
     monkeypatch.setattr(G, "SESSION_POST", None)
     assert G.human_blocker(pr) is None                        # no standing on the repo: untrusted
+
+
+def test_an_issue_number_is_marked_once_and_then_skipped():
+    s = S.empty_state()
+    S.pr(s, 131)
+    calls = []
+    def fetch_pr(n):
+        calls.append(n)
+        raise RuntimeError("GraphQL: Could not resolve to a PullRequest with the number of 131. (repository.pullRequest)")
+    res = G.snapshot(s, {131}, fetch_pr=fetch_pr, fetch_unresolved=lambda n: 0, sleep=lambda _: None)
+    assert res["errors"] == {}
+    assert s["prs"]["131"]["state"] == G.NOT_A_PR
+    G.snapshot(s, {131}, fetch_pr=fetch_pr, fetch_unresolved=lambda n: 0, sleep=lambda _: None)
+    assert calls == [131]           # the second snapshot never asked again
+
+
+def test_merged_and_closed_rows_are_not_refetched_unless_a_search_found_them():
+    s = S.empty_state()
+    for n, st, sc in ((1, "MERGED", []), (2, "CLOSED", []), (3, "CLOSED", ["mine"]), (4, "OPEN", [])):
+        S.pr(s, n).update(state=st, scopes=sc)
+    seen = []
+    def fetch_pr(n):
+        seen.append(n)
+        raise RuntimeError("boom")
+    G.snapshot(s, {1, 2, 3, 4}, fetch_pr=fetch_pr, fetch_unresolved=lambda n: 0, sleep=lambda _: None)
+    assert sorted(seen) == [3, 4]

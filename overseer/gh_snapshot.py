@@ -227,6 +227,9 @@ def scope_numbers(state, list_cmds=LIST_CMDS):
     return nums
 
 
+NOT_A_PR = "NOT_A_PR"
+DONE_STATES = ("MERGED", "CLOSED")
+NOT_A_PR_ERROR = "Could not resolve to a PullRequest"
 MERGEABLE_RETRY_WAIT = 5   # seconds; GitHub computes mergeability lazily, so the first read after main moves says UNKNOWN
 
 
@@ -235,6 +238,11 @@ def snapshot(state, numbers, fetch_pr=fetch_pr, fetch_unresolved=fetch_unresolve
     result = {"updated": [], "errors": {}}
     for n in sorted(numbers):
         row = S.pr(state, n)
+        if row.get("state") == NOT_A_PR:     # an issue number a report cited; GitHub said so once, stop asking
+            continue
+        if row.get("state") in DONE_STATES and not row.get("scopes"):
+            continue                         # merged or closed and no open-PR search found it again: nothing changes
+            # (re-reading hundreds of merged rows every tick trips GitHub's secondary rate limit)
         try:
             prev = row.get("rounds")
             row.update(classify_pr(fetch_pr(n), fetch_unresolved(n)))
@@ -243,6 +251,10 @@ def snapshot(state, numbers, fetch_pr=fetch_pr, fetch_unresolved=fetch_unresolve
             row["drift"] = compute_drift(row)
             result["updated"].append(n)
         except Exception as e:  # keep the old row, record why
+            if NOT_A_PR_ERROR in str(e):
+                row["state"] = NOT_A_PR
+                row["snapshot_error"] = None
+                continue
             row["snapshot_error"] = str(e)
             result["errors"][n] = str(e)
     _retry_unknown_mergeable(state, result["updated"], fetch_pr, sleep)

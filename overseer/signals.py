@@ -110,7 +110,8 @@ def compute_actions(state, now, default_cadence_min=30):
             if row["status"] == "waiting-review" and not p.get("reviewers") and not p.get("lgtm") and not p.get("draft") \
                     and moved is not None \
                     and moved >= timedelta(hours=NO_REVIEWER_HOURS):
-                if not _open(state, name, "no-reviewer", num) and not S.snoozed(state, name, "no-reviewer", num):
+                if not _open(state, name, "no-reviewer", num) and not S.snoozed(state, name, "no-reviewer", num) \
+                        and p.get("no_reviewer_sent") != (p.get("head") or "-"):
                     actions.append(_action("ADVICE", name, num, "no-reviewer",
                                            f"#{num} parked waiting-review with no reviewer for a day; a reviewer auto-assigns only after a clean bot round, so check the latest round is clean and otherwise ask the human"))
         if not owned and row["roster_status"] == "idle" and row["status"] == "working" \
@@ -130,6 +131,9 @@ def apply_actions(state, actions, now):
                 row["ladder"] = a["ladder"]
         if a.get("kind") == "human-review" and a.get("pr") is not None:
             S.pr(state, a["pr"])["human_blocker_sent"] = a["at"]     # once per review, not once per tick
+        if a.get("kind") == "no-reviewer" and a.get("pr") is not None:
+            p = S.pr(state, a["pr"])
+            p["no_reviewer_sent"] = p.get("head") or "-"            # once per head, not once per tick
         if a["type"] == "ATTENTION":
             item = S.add_attention(state, a["session"], a["kind"], a["pr"], a["reason"], now)
             if item:

@@ -303,3 +303,15 @@ def test_human_blocker_on_a_draft_is_not_advised():
     s = base()
     s["prs"]["5"].update(human_blocker=HB, reviewers=["reviewer-1"], draft=True)
     assert [a for a in X.compute_actions(s, T0) if a["kind"] == "human-review"] == []
+
+
+def test_no_reviewer_advice_fires_once_per_head():
+    s = base()
+    s["prs"]["5"].update(reviewers=[], last_activity=T0, head="aaaaaaaa")
+    s["sessions"]["worker-1"]["status"] = "waiting-review"
+    a = types(X.compute_actions(s, T_PLUS_2D), "ADVICE")
+    assert a and a[0]["kind"] == "no-reviewer"
+    X.apply_actions(s, a, T_PLUS_2D)
+    assert types(X.compute_actions(s, T_PLUS_2D), "ADVICE") == []      # sent for this head already
+    s["prs"]["5"]["head"] = "bbbbbbbb"
+    assert types(X.compute_actions(s, T_PLUS_2D), "ADVICE")            # a new head can earn it again

@@ -163,7 +163,7 @@ Signals checked each tick for sessions that have not self-reported:
 | Gone from roster while owning open PRs | immediate | attention item "orphan", offer reassignment |
 | Unresolved threads untouched, owner silent | 2 h | PING; attention after one more tick |
 | Red check | 1 h | PING; attention after one more tick |
-| Parked waiting-review, no reviewer assigned | 1 day | ADVICE (request review); attention after one more tick |
+| Parked waiting-review, no reviewer assigned | 1 day | ADVICE (request review), once per head; attention after one more tick |
 | Gating rounds | 6 or more | STOP, attention item "drift check" |
 
 Ladder for a non-reporting session: PING with an idle subscription (1) → next tick PING
