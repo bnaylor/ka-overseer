@@ -77,6 +77,8 @@ def last_activity(pr):
 
 def _rounds(reviews, login):
     """One round per distinct commit the bot reviewed; a duplicate submission on the same commit is not a new round."""
+    if not login:                     # no such bot configured
+        return 0
     commits = set()
     n = 0
     for r in reviews:

@@ -9,4 +9,8 @@ overseer/dashboard.html
 overseer/OVERSEER
 overseer/decisions.log
 overseer/drift/
+<<<<<<< HEAD
 overseer/worktree-keep.json
+=======
+overseer/config.json
+>>>>>>> origin/main

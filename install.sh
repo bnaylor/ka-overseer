@@ -22,6 +22,8 @@ echo "skill linked: ~/.claude/skills/working-with-the-overseer -> $here/skills/w
 chmod +x "$here/overseer/watch.sh"
 python3 -m pytest "$here/overseer/tests" -q
 
+[[ -f "$here/overseer/config.json" ]] \
+  || print -u2 "install: warning: no overseer/config.json yet, so the defaults apply (no repo, no review bots). Run configure.py first."
 repo=$(python3 -c "import sys; sys.path.insert(0, '$here/overseer'); import config; print(config.CFG['repo'])")
 echo
 echo "Configured for repo: $repo   (change with: python3 $here/overseer/configure.py --repo owner/name ...)"

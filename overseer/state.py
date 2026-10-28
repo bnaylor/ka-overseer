@@ -416,7 +416,7 @@ def apply_roster(state, roster, now):
         _clear_kind(state, name, "orphan")
         _clear_kind(state, name, "gone-question")    # back on the roster: a live session re-raises what it still needs
         if a["status"] == "waiting":
-            already = any(i["session"] == name and i["kind"] in ("waiting-bnaylor", "waiting-human") for i in state["attention"])
+            already = any(i["session"] == name and i["kind"] == "waiting-human" for i in state["attention"])
             if not already:                          # the session announced this stall itself; one item is enough
                 owned = _owned_open_prs(state, name)
                 item = add_attention(state, name, "waiting", owned[0] if owned else None,

@@ -15,7 +15,7 @@ def fake_spawn(calls, report_text=None):
 
 def base_state(head="abc12345", rounds=7):
     st = S.empty_state()
-    S.pr(st, 2401).update(head=head, rounds=rounds, owner="kube-agents-vamp-27")
+    S.pr(st, 2401).update(head=head, rounds=rounds, owner="worker-27")
     return st
 
 
@@ -103,8 +103,8 @@ def test_tick_helpers_launch_on_drift_check_and_raise_the_finished_report(tmp_pa
     monkeypatch.setattr(D, "ALIVE", lambda pid: False)
     p = ovsr.Paths(tmp_path)
     st = base_state()
-    actions = [{"type": "ATTENTION", "session": "kube-agents-vamp-27", "pr": 2401, "kind": "drift-check"},
-               {"type": "PING", "session": "kube-agents-vamp-0a", "pr": 2290, "kind": "stalled"}]
+    actions = [{"type": "ATTENTION", "session": "worker-27", "pr": 2401, "kind": "drift-check"},
+               {"type": "PING", "session": "worker-0a", "pr": 2290, "kind": "stalled"}]
     assert ovsr._drift_tick(p, st, actions, "2026-10-07T01:00:00Z") == [2401]
     new = ovsr._drift_collect(st, "2026-10-07T01:05:00Z")
     assert len(new) == 1 and new[0]["kind"] == "drift-review" and new[0]["manual"]
@@ -113,6 +113,6 @@ def test_tick_helpers_launch_on_drift_check_and_raise_the_finished_report(tmp_pa
 
 def test_roster_skips_the_drift_runs_but_keeps_peers():
     import roster as R
-    agents = [{"name": "drift-pr-2401", "cwd": "/Users/bnaylor/src/kube-agents-vamp", "status": "busy"},
-              {"name": "kube-agents-vamp-27", "cwd": "/Users/bnaylor/src/kube-agents-vamp", "status": "idle"}]
-    assert [a["name"] for a in R.filter_roster(agents)] == ["kube-agents-vamp-27"]
+    agents = [{"name": "drift-pr-2401", "cwd": "/home/dev/src/widget", "status": "busy"},
+              {"name": "worker-27", "cwd": "/home/dev/src/widget", "status": "idle"}]
+    assert [a["name"] for a in R.filter_roster(agents)] == ["worker-27"]

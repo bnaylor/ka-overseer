@@ -46,10 +46,12 @@ and does the rest.
 1. Put this directory somewhere stable, e.g. `~/ka-overseer`. The code finds its own files.
 2. Configure: `python3 overseer/configure.py --repo owner/name --gating-bot <login>
    --advisory-bot <login or ""> --session-pattern '<regex>' [--cwd-prefix <path>] [--human "<name>"]`.
-   It writes `overseer/config.json`; edit that directly for anything else (round cap, ignored
-   check contexts, scope queries, `non_human_reviewers`: logins whose reviews never count as a
-   human's, such as the account your sessions post as; `session_post_pattern`: a regex for comments
-   your sessions post under a human's account, so they never read as a reviewer blocking).
+   It writes `overseer/config.json` (git-ignored, so a pull never touches it); edit that directly for
+   anything else (round cap, ignored check contexts, scope queries, `non_human_reviewers`: logins whose
+   reviews never count as a human's, such as the account your sessions post as; `session_post_pattern`:
+   a regex for comments your sessions post under a human's account, so they never read as a reviewer
+   blocking). `overseer/config.example.json` shows every key; without a config.json the defaults in
+   `overseer/config.py` apply, which watch no repo and count no bot reviews.
 3. `./install.sh` checks prerequisites, symlinks the skill into `~/.claude/skills/` so every
    session can see it, and runs the test suite.
 4. In a spare terminal: `zsh overseer/watch.sh`.
@@ -78,7 +80,7 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `overseer/roster.py`, `overseer/watch.sh` | roster reader and the one-minute watcher |
 | `overseer/render.py` | state to dashboard |
 | `overseer/drift.py`, `overseer/drift-prompt.md` | a PR past the round cap gets a read-only `claude -p` drift review (once per head); the verdict lands as attention. The Overseer fetches the PR history itself; the agent gets Read/Grep/Glob over that bundle and nothing else |
-| `overseer/config.json`, `overseer/configure.py` | deployment settings, and the flag-driven writer for them |
+| `overseer/config.example.json`, `overseer/configure.py` | a sample of the deployment settings, and the flag-driven writer of the real, git-ignored `overseer/config.json` |
 | `overseer/worktree-keep.example.json` | shape of the optional `worktree-keep.json`: worktrees the dashboard must never offer for removal |
 | `overseer/tests/` | `python3 -m pytest overseer/tests -q` |
 | `docs/` | design, protocol, rules, escalation, original brief |
@@ -86,7 +88,6 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `briefs/` | the Overseer loop brief and the report-in sentence for other briefs |
 | `role-examples/` | starting prompts, permissions and lessons for the planner, minders, cluster manager and worktree cleanup |
 | `INSTALL.md` | step-by-step install for an agent pointed at this repo |
-| `tools/portify.py` | the transform that extracted this package from its origin repo, for the record |
 
 Runtime files the Overseer writes into `overseer/`: `state.json`, `reports.log` (append-only,
 rebuildable), `roster.json`, `dashboard.html`, `drift/`. They are git-ignored here; `reports.log` is

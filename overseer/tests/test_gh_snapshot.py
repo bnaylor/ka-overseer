@@ -5,7 +5,7 @@ from pathlib import Path
 import gh_snapshot as G
 import state as S
 
-FIX = json.loads((Path(__file__).parent / "fixtures" / "pr2077.json").read_text())
+FIX = json.loads((Path(__file__).parent / "fixtures" / "pr129.json").read_text())
 T0 = "2026-10-01T20:00:00Z"
 
 
@@ -25,9 +25,9 @@ def test_classify_real_pr():
     row = G.classify_pr(FIX, unresolved=0)
     assert row["title"].startswith("fix(operator)")
     assert row["head"] == FIX["headRefOid"][:8]
-    assert row["branch"] == "fix/tasks-budget-reads-bridge-concurrency"
-    assert row["rounds"] == len({r["commit"]["oid"] for r in FIX["reviews"] if r["author"]["login"] == "kube-agents-bot"})
-    assert row["advisory_rounds"] == len({r["commit"]["oid"] for r in FIX["reviews"] if r["author"]["login"] == "kyber775"})
+    assert row["branch"] == "fix/worker-budget-concurrency"
+    assert row["rounds"] == len({r["commit"]["oid"] for r in FIX["reviews"] if r["author"]["login"] == G.GATING_BOT})
+    assert row["advisory_rounds"] == len({r["commit"]["oid"] for r in FIX["reviews"] if r["author"]["login"] == G.ADVISORY_BOT})
     labels = {l["name"] for l in FIX["labels"]}
     assert row["approved"] is ("approved" in labels) and row["lgtm"] is ("lgtm" in labels) and row["hold"] is ("do-not-merge/hold" in labels)
     assert row["reviewers"] == [r.get("login") or r.get("name") for r in FIX["reviewRequests"]]
@@ -56,8 +56,8 @@ def test_compute_drift():
 
 def test_snapshot_merges_and_survives_a_failed_fetch():
     s = S.empty_state()
-    S.pr(s, 2077)["owner"] = "kube-agents-vamp-54"
-    S.pr(s, 2077)["owner_belief"] = {"rounds": 5, "threads": 0, "hold": False}
+    S.pr(s, 129)["owner"] = "worker-54"
+    S.pr(s, 129)["owner_belief"] = {"rounds": 5, "threads": 0, "hold": False}
     S.pr(s, 9999)["title"] = "old title"
 
     def fetch_pr(n):
@@ -65,15 +65,15 @@ def test_snapshot_merges_and_survives_a_failed_fetch():
             raise RuntimeError("HTTP 502")
         return FIX
 
-    result = G.snapshot(s, {2077, 9999}, fetch_pr, lambda n: 0, T0)
-    assert result["updated"] == [2077] and list(result["errors"]) == [9999]
-    assert s["prs"]["2077"]["owner"] == "kube-agents-vamp-54"
-    assert s["prs"]["2077"]["rounds"] == G.classify_pr(FIX, 0)["rounds"]
-    assert s["prs"]["2077"]["snapshot_error"] is None
+    result = G.snapshot(s, {129, 9999}, fetch_pr, lambda n: 0, T0)
+    assert result["updated"] == [129] and list(result["errors"]) == [9999]
+    assert s["prs"]["129"]["owner"] == "worker-54"
+    assert s["prs"]["129"]["rounds"] == G.classify_pr(FIX, 0)["rounds"]
+    assert s["prs"]["129"]["snapshot_error"] is None
     assert s["prs"]["9999"]["title"] == "old title"
     assert s["prs"]["9999"]["snapshot_error"] == "HTTP 502"
-    d = s["prs"]["2077"]["drift"]
-    assert d is None if s["prs"]["2077"]["rounds"] == 5 else "GitHub" in d
+    d = s["prs"]["129"]["drift"]
+    assert d is None if s["prs"]["129"]["rounds"] == 5 else "GitHub" in d
 
 
 def test_scope_numbers_unions_lists_and_state():
@@ -91,10 +91,10 @@ def test_tide_context_is_merge_pool_state_not_a_check():
 
 def test_snapshot_keeps_previous_rounds_for_delta_detection():
     s = S.empty_state()
-    G.snapshot(s, {2077}, lambda n: FIX, lambda n: 0, T0)
-    assert s["prs"]["2077"]["rounds_prev"] is None
-    G.snapshot(s, {2077}, lambda n: FIX, lambda n: 0, T0)
-    assert s["prs"]["2077"]["rounds_prev"] == s["prs"]["2077"]["rounds"]
+    G.snapshot(s, {129}, lambda n: FIX, lambda n: 0, T0)
+    assert s["prs"]["129"]["rounds_prev"] is None
+    G.snapshot(s, {129}, lambda n: FIX, lambda n: 0, T0)
+    assert s["prs"]["129"]["rounds_prev"] == s["prs"]["129"]["rounds"]
 
 
 def test_fetch_unresolved_paginates_past_100_threads():
@@ -133,14 +133,14 @@ def test_last_activity_is_the_latest_real_event_not_updated_at():
 
 
 def test_optional_next_lane_does_not_make_a_pr_red():
-    rollup = [{"__typename": "StatusContext", "context": "pull-kube-agents-smoke-test-next", "state": "FAILURE"},
-              {"__typename": "StatusContext", "context": "pull-kube-agents-smoke-test", "state": "SUCCESS"}]
+    rollup = [{"__typename": "StatusContext", "context": "pull-widget-smoke-test-next", "state": "FAILURE"},
+              {"__typename": "StatusContext", "context": "pull-widget-smoke-test", "state": "SUCCESS"}]
     assert G.checks_state(rollup) == "green"
 
 
 def test_rounds_count_distinct_commits_not_duplicate_submissions():
     pr = dict(FIX)
-    bot = [r for r in FIX["reviews"] if r["author"]["login"] == "kube-agents-bot"]
+    bot = [r for r in FIX["reviews"] if r["author"]["login"] == G.GATING_BOT]
     pr["reviews"] = FIX["reviews"] + [dict(bot[0])]          # the bot submitted twice on the same commit
     assert G.classify_pr(pr, 0)["rounds"] == G.classify_pr(FIX, 0)["rounds"]
     assert G.classify_pr(FIX, 0)["rounds"] == len({r["commit"]["oid"] for r in bot})
@@ -168,16 +168,16 @@ def test_snapshot_rereads_an_unknown_mergeable_once_after_a_wait():
         reads["n"] += 1
         return {**FIX, "state": "OPEN", "mergeable": "UNKNOWN" if reads["n"] == 1 else "CONFLICTING"}
 
-    G.snapshot(s, {2077}, fetch_pr, lambda n: 0, T0, sleep=waits.append)
-    assert s["prs"]["2077"]["mergeable"] == "CONFLICTING"
+    G.snapshot(s, {129}, fetch_pr, lambda n: 0, T0, sleep=waits.append)
+    assert s["prs"]["129"]["mergeable"] == "CONFLICTING"
     assert waits == [G.MERGEABLE_RETRY_WAIT] and reads["n"] == 2
 
 
 def test_snapshot_skips_the_wait_when_nothing_is_unknown():
     s = S.empty_state()
     waits = []
-    G.snapshot(s, {2077}, lambda n: {**FIX, "state": "OPEN", "mergeable": "MERGEABLE"}, lambda n: 0, T0, sleep=waits.append)
-    assert waits == [] and s["prs"]["2077"]["mergeable"] == "MERGEABLE"
+    G.snapshot(s, {129}, lambda n: {**FIX, "state": "OPEN", "mergeable": "MERGEABLE"}, lambda n: 0, T0, sleep=waits.append)
+    assert waits == [] and s["prs"]["129"]["mergeable"] == "MERGEABLE"
 
 
 def test_human_blocker_finds_a_body_only_block_after_the_last_commit():
