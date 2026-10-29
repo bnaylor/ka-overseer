@@ -42,7 +42,7 @@ All under `overseer/` in this repo unless noted.
 | `rules.md` | numbered process rules relayed to sessions | the human via the Overseer |
 | `escalation.md` | stall signals, thresholds, ladder | Overseer session, with the human |
 | `state.json` | single source of truth | Overseer only |
-| `reports.log` | append-only, one JSON line per received report | Overseer only |
+| `logs/reports.log` | append-only, one JSON line per received report | Overseer only |
 | `gh_snapshot.py` | the only place `gh` is called; writes the `prs` part of state and looks up PRs for worktree branches | code |
 | `worktrees.py` | lists the extra git worktrees under the watched folders, with owner, PR and cleanup status; read-only | code |
 | `watch.sh` | every 60 s: roster to `roster.json`, render, notify on a new `waiting` session | code |

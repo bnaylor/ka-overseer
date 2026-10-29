@@ -89,9 +89,12 @@ cross-session messaging (`ListAgents`, `SendMessage`, `claude agents --json`).
 | `role-examples/` | starting prompts, permissions and lessons for the planner, minders, cluster manager and worktree cleanup |
 | `INSTALL.md` | step-by-step install for an agent pointed at this repo |
 
-Runtime files the Overseer writes into `overseer/`: `state.json`, `reports.log` (append-only,
-rebuildable), `roster.json`, `dashboard.html`, `drift/`. They are git-ignored here; `reports.log` is
-enough to rebuild the table.
+Runtime files the Overseer writes into `overseer/`: `state.json`, `logs/reports.log` (append-only,
+rebuildable), `logs/decisions.log`, `roster.json`, `dashboard.html`, `drift/`. They are git-ignored
+here; `logs/reports.log` is enough to rebuild the table. The logs sit in their own folder because
+Claude Code shows the human a diff whenever a file the session has Read changes on disk: the Overseer
+session should query them through Bash, never open them with Read, and the console stays quiet. An
+older install's top-level `reports.log` and `decisions.log` move into `logs/` on the next run.
 
 ## Things learned the hard way
 

@@ -470,6 +470,7 @@ def retire_due(state, now, hours=24, ephemeral_hours=1):
 
 
 def append_log(log_path, sender, raw, now):
+    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
     with Path(log_path).open("a") as f:
         f.write(json.dumps({"ts": now, "from": sender, "raw": raw}) + "\n")
 

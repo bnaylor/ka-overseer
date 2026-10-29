@@ -50,7 +50,7 @@ Each starts with a fixed first word.
 | `DECISION ... Verbatim: "<quote>"` | a decision the human made in the Overseer's session, quoted word for word | act on it as on an instruction typed in your session, including outward-facing steps it names; report when done |
 
 DECISION is sent only after the human has said the quoted words in the Overseer's session; the
-Overseer never paraphrases a decision into one and logs each in `decisions.log`. STOP is sent only for a written rule in `rules.md`. The current STOP cases are: gating rounds
+Overseer never paraphrases a decision into one and logs each in `logs/decisions.log`. STOP is sent only for a written rule in `rules.md`. The current STOP cases are: gating rounds
 at or past the cap, a push during a live gating round, and a `/hold` placed without a
 clearance criterion.
 

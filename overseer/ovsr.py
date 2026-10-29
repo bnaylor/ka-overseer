@@ -38,7 +38,21 @@ class Paths:
         self.dir = Path(d)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state = self.dir / "state.json"
-        self.log = self.dir / "reports.log"
+        # The two append-only logs live in logs/.  Claude Code shows the human a diff whenever a file
+        # the session has Read changes on disk; keeping these out of the files a session opens keeps
+        # that console quiet.  Only ovsr.py writes them; query them through Bash, not Read.
+        self.logs = self.dir / "logs"
+        self.log = self.logs / "reports.log"
+        self.decisions = self.logs / "decisions.log"
+        self._migrate_logs()
+
+    def _migrate_logs(self):
+        """One-time move of logs an older install kept at the top of the directory."""
+        for name in ("reports.log", "decisions.log"):
+            old, new = self.dir / name, self.logs / name
+            if old.exists() and not new.exists():
+                self.logs.mkdir(parents=True, exist_ok=True)
+                old.rename(new)
         self.roster = self.dir / "roster.json"
         self.rules = self.dir.parent / "docs" / "rules.md"
         self.skill = self.dir.parent / "skills" / "working-with-the-overseer" / "SKILL.md"
@@ -321,7 +335,8 @@ DECISION_TEXT = ("DECISION from {human} via the Overseer, on {scope}. Verbatim: 
 def cmd_decision(p, a):
     """Relay a decision the human made in the Overseer's session, quoted verbatim, and log it."""
     now = S.now_iso()
-    with (p.dir / "decisions.log").open("a") as f:
+    p.decisions.parent.mkdir(parents=True, exist_ok=True)
+    with p.decisions.open("a") as f:
         f.write(json.dumps({"ts": now, "to": a.session, "pr": a.pr, "quote": a.quote}) + "\n")
     scope = f"#{a.pr}" if a.pr not in (None, "-", "") else "your current work"
     print(DECISION_TEXT.format(human=CFG["human"], scope=scope, quote=a.quote))

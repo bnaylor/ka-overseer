@@ -24,7 +24,7 @@ def test_report_appends_log_applies_and_renders(tmp_path, monkeypatch, capsys):
     assert ovsr.main(["--dir", d, "report"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["ok"] and out["session"] == "worker-54" and len(out["new_attention"]) == 1
-    assert (Path(d) / "reports.log").read_text().count("\n") == 1
+    assert (Path(d) / "logs" / "reports.log").read_text().count("\n") == 1
     assert (Path(d) / "dashboard.html").exists()
     assert S.load_state(Path(d) / "state.json")["sessions"]["worker-54"]["role"] == "pr-minder"
     assert ovsr.FIRED == ["worker-54: which side moves"]
@@ -35,7 +35,7 @@ def test_unparseable_report_exits_2(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO("hi"))
     assert ovsr.main(["--dir", d, "report", "--from", "worker-9"]) == 2
     assert json.loads(capsys.readouterr().out)["ok"] is False
-    assert (Path(d) / "reports.log").read_text().count("\n") == 1   # still logged
+    assert (Path(d) / "logs" / "reports.log").read_text().count("\n") == 1   # still logged
 
 
 def test_tick_without_gh_applies_roster_and_computes_actions(tmp_path, monkeypatch, capsys):
@@ -248,7 +248,7 @@ def test_decision_command_logs_and_prints_a_verbatim_decision(tmp_path, monkeypa
     assert ovsr.main(["--dir", d, "decision", "worker-d4", "1884", "I agree with the push and the split."]) == 0
     out = capsys.readouterr().out
     assert out.startswith("DECISION from the human via the Overseer") and '"I agree with the push and the split."' in out and "#1884" in out
-    log = (Path(d) / "decisions.log").read_text().splitlines()
+    log = (Path(d) / "logs" / "decisions.log").read_text().splitlines()
     assert len(log) == 1 and json.loads(log[0])["to"] == "worker-d4" and json.loads(log[0])["quote"] == "I agree with the push and the split."
 
 
@@ -321,3 +321,15 @@ def test_a_claim_on_a_pr_the_tick_first_sees_survives_the_tick(tmp_path, monkeyp
     st = S.load_state(Path(d) / "state.json")
     assert st["prs"]["8"]["owner"] == "worker-a"                  # the blank row's owner=None didn't wipe the claim
     assert st["prs"]["8"]["mergeable"] == "MERGEABLE"
+
+
+def test_an_older_installs_top_level_logs_move_into_logs_once(tmp_path):
+    import ovsr
+    (tmp_path / "reports.log").write_text('{"ts": "t", "from": "s", "raw": "r"}\n')
+    (tmp_path / "decisions.log").write_text("d\n")
+    p = ovsr.Paths(str(tmp_path))
+    assert not (tmp_path / "reports.log").exists() and not (tmp_path / "decisions.log").exists()
+    assert p.log.read_text().count("\n") == 1 and p.decisions.read_text() == "d\n"
+    (tmp_path / "reports.log").write_text("stray\n")          # a later stray file never overwrites the moved log
+    ovsr.Paths(str(tmp_path))
+    assert p.log.read_text().count("\n") == 1

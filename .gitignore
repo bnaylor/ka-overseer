@@ -4,6 +4,7 @@ __pycache__/
 overseer/state.json
 overseer/state.json.lock
 overseer/reports.log
+overseer/logs/
 overseer/roster.json
 overseer/dashboard.html
 overseer/OVERSEER
